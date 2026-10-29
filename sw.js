@@ -1,5 +1,5 @@
 // 配信ファイルを変更するときは、このバージョンも変更する。
-const CACHE_NAME = "taskflow-shell-v1";
+const CACHE_NAME = "taskflow-shell-v2";
 const SHELL_FILES = [
   "./index.html", "./style.css", "./script.js", "./pwa.js",
   "./manifest.webmanifest", "./icons/icon-192.png",

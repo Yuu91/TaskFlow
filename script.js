@@ -108,6 +108,13 @@ function validateData(data) {
         (task.plannedDate != null && !validDate(task.plannedDate)) ||
         (task.migrationCount != null && (!Number.isSafeInteger(task.migrationCount) || task.migrationCount < 0))) throw new Error("Invalid task");
     ids.add(task.id);
+    if (task.migrationUndo != null) {
+      const undo = task.migrationUndo;
+      if (typeof undo !== "object" || Array.isArray(undo) ||
+          (undo.plannedDate !== null && !validDate(undo.plannedDate)) ||
+          !Number.isSafeInteger(undo.migrationCount) || undo.migrationCount < 0 ||
+          !validDate(undo.targetDate)) throw new Error("Invalid migration undo");
+    }
   }
   for (const [day, review] of Object.entries(data.dailyReviews)) {
     if (!validDate(day) || !review || typeof review.memo !== "string") throw new Error("Invalid review");
@@ -321,6 +328,7 @@ saveEditButton.addEventListener("click", function () {
   // 手動の移行予定日をリセット
   if (oldDeadline !== task.deadline || oldSize !== task.size) {
     task.plannedDate = null;
+    delete task.migrationUndo;
   }
 
   if (!saveTasks()) return;
@@ -690,6 +698,7 @@ function createTaskCard(task) {
   buttonGroup.appendChild(completeButton);
   buttonGroup.appendChild(editButton);
   buttonGroup.appendChild(deleteButton);
+  if (canUndoMigration(task)) buttonGroup.appendChild(createUndoMigrationButton(task));
 
   li.appendChild(taskInfo);
   li.appendChild(progressContainer);
@@ -787,6 +796,12 @@ function migrateTaskToTomorrow(id) {
   const tomorrow = addDays(today, 1);
 
   // 次に取り組む予定日を明日に設定
+  if (task.plannedDate === formatDate(tomorrow)) return;
+  task.migrationUndo = {
+    plannedDate: task.plannedDate ?? null,
+    migrationCount: task.migrationCount ?? 0,
+    targetDate: formatDate(tomorrow),
+  };
   task.plannedDate = formatDate(tomorrow);
 
   // 移行した回数を記録
@@ -794,6 +809,31 @@ function migrateTaskToTomorrow(id) {
 
   saveTasks();
   displayTasks();
+}
+
+function canUndoMigration(task) {
+  return !task.completed && task.migrationUndo != null &&
+    task.plannedDate === task.migrationUndo.targetDate &&
+    task.migrationCount === task.migrationUndo.migrationCount + 1;
+}
+
+function undoTaskMigration(id) {
+  const task = tasks.find(task => task.id === id);
+  if (!task || !canUndoMigration(task)) return;
+  task.plannedDate = task.migrationUndo.plannedDate;
+  task.migrationCount = task.migrationUndo.migrationCount;
+  delete task.migrationUndo;
+  if (saveTasks()) displayTasks();
+}
+
+function createUndoMigrationButton(task) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "migrate-button";
+  button.textContent = "移行を取り消す";
+  button.setAttribute("aria-label", `${task.title}の明日への移行を取り消す`);
+  button.addEventListener("click", () => undoTaskMigration(task.id));
+  return button;
 }
 
 /* ===== 今日・明日・今週の分類 ===== */
@@ -1078,6 +1118,7 @@ function createDailyTaskItem(task) {
   actions.className = "daily-task-actions";
 
   actions.appendChild(score);
+  if (canUndoMigration(task)) actions.appendChild(createUndoMigrationButton(task));
 
   // 今日のタスクにだけ移行ボタンを表示
   const todayText = formatDate(new Date());
