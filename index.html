@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TaskFlow</title>
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="TaskFlow" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+
+  <body>
+    <header class="app-header">
+      <h1>TaskFlow</h1>
+      <p>あなたのタスクを賢く管理するアプリ</p>
+    </header>
+    <div class="pwa-status" role="status">
+      <span id="pwaStatus">オフライン利用の準備状況を確認しています。</span>
+      <button id="pwaUpdate" type="button" hidden>更新する</button>
+    </div>
+    <p id="storageMessage" role="status" hidden></p>
+    <section class="backup-controls" aria-label="データ管理">
+      <button id="exportButton" type="button">バックアップを保存</button>
+      <button id="importButton" type="button">バックアップから復元</button>
+      <input id="importFile" type="file" accept=".json,application/json" hidden />
+      <p>復元すると現在の全データを置き換えます。先にバックアップを保存してください。</p>
+    </section>
+
+    <main class="app-container">
+      <!-- ===== ホーム画面 ===== -->
+
+      <div id="homeScreen">
+        <div class="taskflow-layout">
+          <!-- 左側：タスク追加エリア -->
+          <aside class="taskflow-sidebar">
+            <section class="task-form-panel">
+              <h2>＋ 新しいタスク</h2>
+
+              <div class="task-form">
+                <label for="taskInput">タスク名</label>
+                <input
+                  type="text"
+                  id="taskInput"
+                  placeholder="やることを入力"
+                />
+
+                <label for="deadlineInput">締切</label>
+                <input type="date" id="deadlineInput" />
+
+                <label for="priorityInput">重要度</label>
+                <select id="priorityInput">
+                  <option value="high">高</option>
+                  <option value="medium" selected>中</option>
+                  <option value="low">低</option>
+                </select>
+
+                <label for="sizeInput">作業規模</label>
+                <select id="sizeInput">
+                  <option value="short">短い</option>
+                  <option value="normal" selected>普通</option>
+                  <option value="long">長い</option>
+                  <option value="veryLong">かなり長い</option>
+                </select>
+
+                <button id="addButton">タスクを追加</button>
+              </div>
+            </section>
+
+            <!-- ===== 達成履歴 ===== -->
+
+            <!-- ===== 達成履歴 ===== -->
+
+            <!-- ===== 達成履歴 ===== -->
+            <section class="completed-panel completed-preview">
+              <h2>達成履歴</h2>
+
+              <ul id="completedList"></ul>
+
+              <button
+                id="viewAllCompletedButton"
+                class="view-all-button"
+                type="button"
+                hidden
+              >
+                すべての達成タスクを見る
+              </button>
+            </section>
+          </aside>
+
+          <!-- 右側：メインコンテンツ -->
+          <div class="taskflow-main">
+            <!-- ===== 今日のプラン ===== -->
+
+            <section class="daily-plan-panel">
+              <h2>今日のプラン</h2>
+
+              <div class="daily-summary">
+                <div class="summary-card">
+                  <span>今日</span>
+                  <strong id="todayCount">0件</strong>
+                </div>
+
+                <div class="summary-card">
+                  <span>明日</span>
+                  <strong id="tomorrowCount">0件</strong>
+                </div>
+
+                <div class="summary-card">
+                  <span>今週（今日・明日を除く）</span>
+                  <strong id="weekCount">0件</strong>
+                </div>
+              </div>
+
+              <div class="daily-task-panel">
+                <h3>今日やるべきタスク</h3>
+                <ul id="todayTaskList"></ul>
+                <p id="todayEmptyMessage" hidden>
+                  今日着手が必要なタスクはありません。
+                </p>
+              </div>
+
+              <div class="daily-task-panel">
+                <h3>明日から始めるタスク</h3>
+                <ul id="tomorrowTaskList"></ul>
+              </div>
+
+              <div class="daily-task-panel">
+                <h3>今週から始めるタスク</h3>
+                <ul id="weekTaskList"></ul>
+              </div>
+            </section>
+
+            <!-- ===== デイリーレビュー ===== -->
+            <section class="daily-review-panel">
+              <h2>今日の振り返り</h2>
+
+              <div class="review-summary">
+                <div class="review-summary-card">
+                  <span>今日完了したタスク</span>
+                  <strong id="reviewCompletedCount">0件</strong>
+                </div>
+
+                <div class="review-summary-card">
+                  <span>今日残っているタスク</span>
+                  <strong id="reviewRemainingCount">0件</strong>
+                </div>
+              </div>
+
+              <div class="review-card">
+                <h3>今日完了したこと</h3>
+
+                <ul id="reviewCompletedList"></ul>
+
+                <p id="reviewCompletedEmpty" hidden>
+                  今日完了したタスクはまだありません。
+                </p>
+              </div>
+
+              <div class="review-card">
+                <h3>今日残っているタスク</h3>
+
+                <ul id="reviewRemainingList"></ul>
+
+                <p id="reviewRemainingEmpty" hidden>
+                  今日残っているタスクはありません。
+                </p>
+              </div>
+
+              <div class="review-card">
+                <h3><label for="reviewMemo">明日に向けたメモ</label></h3>
+                <p id="reviewDate"></p>
+
+                <textarea
+                  id="reviewMemo"
+                  placeholder="今日できたこと、反省、明日やりたいことなど..."
+                  rows="5"
+                ></textarea>
+
+                <button id="saveReviewButton" type="button">
+                  振り返りを保存
+                </button>
+
+                <p id="reviewSaveMessage" hidden>振り返りを保存しました！</p>
+              </div>
+            </section>
+
+            <!-- ===== 進行中のタスク ===== -->
+            <section class="task-list-panel">
+              <h2>
+                進行中のタスク
+                <span id="taskCount"></span>
+              </h2>
+
+              <ul id="taskList"></ul>
+
+              <button id="viewAllButton" class="view-all-button">
+                すべてのタスクを見る
+              </button>
+            </section>
+          </div>
+          <!-- taskflow-main -->
+        </div>
+        <!-- taskflow-layout -->
+      </div>
+      <!-- homeScreen -->
+
+      <!-- ===== すべてのタスク画面 ===== -->
+
+      <!-- ===== すべてのタスク画面 ===== -->
+      <section id="allTasksScreen" hidden>
+        <div class="all-tasks-header">
+          <button id="backButton" class="back-button">← ホームに戻る</button>
+
+          <h2>すべてのタスク</h2>
+          <p id="allTasksCount"></p>
+        </div>
+
+        <!-- 検索・並び替え・絞り込み -->
+        <div class="task-controls">
+          <div class="control-field">
+            <label for="taskSearch">タスクを検索</label>
+            <input type="search" id="taskSearch" placeholder="タスク名を入力" />
+          </div>
+
+          <div class="control-field">
+            <label for="taskSort">並び順</label>
+            <select id="taskSort">
+              <option value="deadline">締切が近い順</option>
+              <option value="priority">重要度が高い順</option>
+              <option value="progress">進捗率が高い順</option>
+            </select>
+          </div>
+
+          <div class="control-field">
+            <label for="taskFilter">絞り込み</label>
+            <select id="taskFilter">
+              <option value="all">すべて</option>
+              <option value="hasDeadline">締切あり</option>
+              <option value="noDeadline">締切なし</option>
+            </select>
+          </div>
+        </div>
+
+        <ul id="allTasksList"></ul>
+
+        <p id="emptyTaskMessage" hidden>条件に一致するタスクはありません。</p>
+      </section>
+    </main>
+
+    <!-- ===== タスク編集画面 ===== -->
+    <div id="editModal" class="edit-modal" role="dialog" aria-modal="true" aria-labelledby="editTitle" hidden>
+      <div class="edit-modal-content">
+        <h2 id="editTitle">タスクを編集</h2>
+
+        <label for="editTaskInput">タスク名</label>
+        <input type="text" id="editTaskInput" />
+
+        <label for="editDeadlineInput">締切</label>
+        <input type="date" id="editDeadlineInput" />
+
+        <label for="editPriorityInput">重要度</label>
+        <select id="editPriorityInput">
+          <option value="high">高</option>
+          <option value="medium">中</option>
+          <option value="low">低</option>
+        </select>
+
+        <label for="editSizeInput">作業規模</label>
+        <select id="editSizeInput">
+          <option value="short">短い</option>
+          <option value="normal">普通</option>
+          <option value="long">長い</option>
+          <option value="veryLong">かなり長い</option>
+        </select>
+
+        <div class="edit-modal-buttons">
+          <button id="cancelEditButton" type="button">キャンセル</button>
+
+          <button id="saveEditButton" type="button">変更を保存</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="pwa.js"></script>
+  </body>
+</html>

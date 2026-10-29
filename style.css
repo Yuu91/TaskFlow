@@ -1,0 +1,1126 @@
+/* ===== 基本設定 ===== */
+
+* {
+  box-sizing: border-box;
+}
+
+.pwa-status { max-width: 1200px; margin: 12px auto; font-size: 13px; color: #555; }
+.pwa-status button { margin: 8px; }
+.pwa-status button[hidden] { display: none; }
+
+/* データ管理と狭い画面での操作 */
+.backup-controls, #storageMessage {
+  max-width: 1200px;
+  margin: 16px auto;
+}
+.backup-controls { display: flex; gap: 12px; flex-wrap: wrap; }
+.backup-controls p { width: 100%; margin: 0; font-size: 14px; }
+#storageMessage { padding: 12px; background: #fff3cd; overflow-wrap: anywhere; }
+.modal-open { overflow: hidden; }
+
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f5f6f8;
+  color: #222;
+  margin: 0;
+  padding: 24px;
+}
+
+/* ===== ヘッダー ===== */
+
+.app-header {
+  max-width: 1200px;
+  margin: 0 auto 24px;
+}
+
+h1 {
+  font-size: 28px;
+  margin: 0 0 8px;
+}
+
+.app-header p {
+  color: #777;
+  font-size: 13px;
+  margin: 0;
+}
+
+/* ===== 全体レイアウト ===== */
+
+.app-container {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.app-layout {
+  display: grid;
+  grid-template-columns: 1fr 1.8fr;
+  gap: 24px;
+  align-items: start;
+}
+
+/* ===== パネル ===== */
+
+.task-form-panel,
+.task-list-panel,
+.completed-panel {
+  background-color: transparent;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+}
+
+h2 {
+  font-size: 18px;
+  margin: 0 0 16px;
+}
+
+/* ===== タスク登録 ===== */
+
+.task-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.task-form label {
+  font-size: 12px;
+  color: #777;
+}
+
+.task-form input,
+.task-form select {
+  width: 100%;
+  padding: 12px;
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.task-form input:focus,
+.task-form select:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+button {
+  background-color: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 16px;
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(0.92);
+}
+
+#addButton {
+  width: 100%;
+  margin-top: 4px;
+  font-weight: bold;
+}
+
+/* ===== タスク一覧 ===== */
+
+ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* ===== タスクカード ===== */
+#taskList li {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 14px;
+
+  padding: 18px;
+  margin-bottom: 12px;
+}
+
+/* タスクの情報 */
+.task-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.task-info span {
+  font-size: 16px;
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+
+.task-info small {
+  font-size: 12px;
+  color: #888;
+}
+
+/* 進捗率 */
+#taskList input[type="range"] {
+  width: 100%;
+  max-width: none;
+  accent-color: #16a34a;
+  cursor: pointer;
+}
+
+#taskList p {
+  text-align: left;
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+/* ===== 操作ボタン ===== */
+
+.button-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+li button {
+  background-color: #16a34a;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.edit-button {
+  background-color: #f59e0b;
+}
+
+.delete-button {
+  background-color: #ef4444;
+}
+
+/* ===== 達成履歴 ===== */
+
+.completed-panel {
+  margin-top: 36px;
+  padding-top: 24px;
+  border-top: 1px solid #ddd;
+}
+
+#completedList li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  background-color: white;
+  padding: 14px;
+  margin-bottom: 8px;
+  border-radius: 10px;
+  border-left: 4px solid #16a34a;
+}
+
+#completedList small {
+  color: #888;
+  font-size: 12px;
+}
+
+/* ===== スマホ対応 ===== */
+
+@media (max-width: 768px) {
+  body {
+    padding: 16px;
+  }
+
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .button-group {
+    width: 100%;
+  }
+}
+/* ===== 進捗エリア ===== */
+.progress-container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progress-container p {
+  margin: 0;
+  font-size: 13px;
+  color: #555;
+}
+
+.progress-container input[type="range"] {
+  width: 100%;
+  accent-color: #16a34a;
+  cursor: pointer;
+}
+
+/* ===== ボタン配置 ===== */
+#taskList .button-group {
+  display: flex;
+  justify-content: flex-start;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ===== タスク件数 ===== */
+#taskCount {
+  font-size: 13px;
+  font-weight: normal;
+  color: #888;
+  margin-left: 6px;
+}
+
+/* ===== すべて見るボタン ===== */
+.view-all-button {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+
+  background-color: #fff;
+  color: #2563eb;
+  border: 1px solid #d5dbe5;
+  border-radius: 10px;
+
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.view-all-button:hover {
+  background-color: #eff6ff;
+}
+
+/* hidden属性が付いている間は非表示 */
+.view-all-button[hidden] {
+  display: none;
+}
+
+/* ===== 画面切り替え ===== */
+
+/* hidden属性が付いている画面を非表示にする */
+#homeScreen[hidden],
+#allTasksScreen[hidden] {
+  display: none;
+}
+
+/* ===== 全タスク画面 ===== */
+
+.all-tasks-header {
+  margin-bottom: 24px;
+}
+
+.all-tasks-header h2 {
+  margin-top: 18px;
+  margin-bottom: 6px;
+}
+
+#allTasksCount {
+  color: #888;
+  font-size: 13px;
+  margin: 0;
+}
+
+/* 戻るボタン */
+.back-button {
+  background-color: white;
+  color: #2563eb;
+  border: 1px solid #d5dbe5;
+}
+
+.back-button:hover {
+  background-color: #eff6ff;
+}
+
+/* 検索・並び替え・絞り込み */
+.task-controls {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.control-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.control-field label {
+  font-size: 12px;
+  color: #777;
+}
+
+.control-field input,
+.control-field select {
+  width: 100%;
+  padding: 12px;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+/* 全タスク画面でも同じカードデザイン */
+#allTasksList li {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 14px;
+  padding: 18px;
+  margin-bottom: 12px;
+}
+
+#allTasksList input[type="range"] {
+  width: 100%;
+  accent-color: #16a34a;
+  cursor: pointer;
+}
+
+#allTasksList p {
+  text-align: left;
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+/* 検索結果なし */
+#emptyTaskMessage {
+  text-align: center;
+  color: #888;
+  padding: 32px 0;
+}
+
+#emptyTaskMessage[hidden] {
+  display: none;
+}
+
+/* スマホ対応 */
+@media (max-width: 768px) {
+  .task-controls {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===== 自動スケジュール表示 ===== */
+
+.schedule-text {
+  font-size: 12px;
+  color: #2563eb;
+  margin-top: 4px;
+}
+
+.schedule-ready {
+  display: block;
+  background-color: #fff3e0;
+  color: #92400e;
+  font-weight: bold;
+
+  border-left: 4px solid #f59e0b;
+  border-radius: 6px;
+
+  padding: 12px 14px;
+  margin-top: 8px;
+}
+
+/* ===== 優先スコア ===== */
+
+.task-info .priority-score {
+  display: inline-block;
+  align-self: flex-start;
+  width: auto;
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+/* 最優先 */
+.task-info .priority-urgent {
+  background-color: #fef2f2;
+  color: #dc2626;
+}
+
+/* 優先 */
+.task-info .priority-high {
+  background-color: #fff7ed;
+  color: #b45309;
+}
+
+/* 通常 */
+.task-info .priority-normal {
+  background-color: #eff6ff;
+  color: #2563eb;
+}
+
+/* ===== 締切超過 ===== */
+
+.schedule-overdue {
+  display: block;
+  background-color: #fee2e2;
+  color: #991b1b;
+  font-weight: bold;
+
+  border-left: 4px solid #dc2626;
+  border-radius: 6px;
+
+  padding: 12px 14px;
+  margin-top: 8px;
+}
+
+/* ===== 進捗100% ===== */
+
+.schedule-finished {
+  display: block;
+  background-color: #dcfce7;
+  color: #166534;
+  font-weight: bold;
+
+  border-left: 4px solid #16a34a;
+  border-radius: 6px;
+
+  padding: 12px 14px;
+  margin-top: 8px;
+}
+
+/* ===== 今日のプラン ===== */
+
+.daily-plan-panel {
+  margin-bottom: 36px;
+}
+
+.daily-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.summary-card {
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 18px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.summary-card span {
+  color: #777;
+  font-size: 13px;
+}
+
+.summary-card strong {
+  color: #2563eb;
+  font-size: 24px;
+}
+
+.daily-task-panel {
+  margin-bottom: 20px;
+}
+
+.daily-task-panel h3 {
+  font-size: 15px;
+  margin: 0 0 12px;
+}
+
+.daily-task-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+
+  padding: 14px;
+  margin-bottom: 8px;
+}
+
+.daily-task-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.daily-task-info strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.daily-task-info small {
+  font-size: 12px;
+  color: #888;
+}
+
+.daily-score {
+  flex-shrink: 0;
+  background-color: #eff6ff;
+  color: #2563eb;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+#todayEmptyMessage {
+  color: #888;
+  font-size: 13px;
+  padding: 12px 0;
+}
+
+#todayEmptyMessage[hidden] {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .daily-summary {
+    gap: 8px;
+  }
+
+  .summary-card {
+    padding: 12px;
+  }
+
+  .summary-card strong {
+    font-size: 20px;
+  }
+}
+
+/* ===== タスク移行 ===== */
+
+.daily-task-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.migrate-button {
+  background-color: #e2e8f0;
+  color: #334155;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: bold;
+  border-radius: 8px;
+}
+
+.migrate-button:hover {
+  background-color: #cbd5e1;
+}
+
+.migration-text {
+  color: #64748b;
+  font-size: 12px;
+}
+
+@media (max-width: 768px) {
+  .daily-task-item {
+    align-items: flex-start;
+  }
+
+  .daily-task-actions {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+}
+
+/* ===== 編集モーダル ===== */
+
+.edit-modal {
+  position: fixed;
+  inset: 0;
+
+  background-color: rgba(0, 0, 0, 0.5);
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  padding: 20px;
+  z-index: 1000;
+}
+
+.edit-modal[hidden] {
+  display: none;
+}
+
+.edit-modal-content {
+  background-color: white;
+  padding: 28px;
+  border-radius: 14px;
+
+  width: 100%;
+  max-width: 440px;
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow-y: auto;
+
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+}
+
+.edit-modal-content h2 {
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+.edit-modal-content label {
+  display: block;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.edit-modal-content input,
+.edit-modal-content select {
+  width: 100%;
+  box-sizing: border-box;
+
+  padding: 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+
+  font-size: 14px;
+}
+
+.edit-modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+#cancelEditButton {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+#saveEditButton {
+  background-color: #2563eb;
+  color: white;
+}
+
+.edit-modal-buttons button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.edit-modal-buttons button:hover {
+  opacity: 0.85;
+}
+
+/* ===== デイリーレビュー ===== */
+
+.daily-review-panel {
+  margin-bottom: 36px;
+}
+
+.review-summary {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.review-summary-card {
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 18px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.review-summary-card span {
+  color: #777;
+  font-size: 13px;
+}
+
+.review-summary-card strong {
+  color: #2563eb;
+  font-size: 24px;
+}
+
+.review-card {
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.review-card h3 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.review-completed-item {
+  padding: 10px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+
+  background-color: #f0fdf4;
+  color: #166534;
+
+  list-style: none;
+}
+
+.review-remaining-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+
+  padding: 10px;
+  margin-bottom: 8px;
+
+  border-radius: 8px;
+  background-color: #fff7ed;
+
+  list-style: none;
+}
+
+#reviewCompletedList,
+#reviewRemainingList {
+  padding-left: 0;
+}
+
+#reviewMemo {
+  width: 100%;
+  box-sizing: border-box;
+
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+
+  font-size: 14px;
+  resize: vertical;
+}
+
+#saveReviewButton {
+  margin-top: 12px;
+
+  padding: 10px 18px;
+  background-color: #2563eb;
+  color: white;
+
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+#saveReviewButton:hover {
+  background-color: #1d4ed8;
+}
+
+#reviewSaveMessage {
+  color: #16a34a;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+#reviewSaveMessage[hidden] {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .review-summary-card {
+    padding: 12px;
+  }
+
+  .review-remaining-item {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+/* ===== 左側フォーム＋右側コンテンツ ===== */
+
+.taskflow-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* 左側のタスク追加エリア */
+.taskflow-sidebar {
+  position: sticky;
+  top: 20px;
+  min-width: 0;
+}
+
+/* 右側のメインコンテンツ */
+.taskflow-main {
+  min-width: 0;
+}
+
+/* スマホでは縦並び */
+@media (max-width: 900px) {
+  .taskflow-layout {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .taskflow-sidebar {
+    position: static;
+  }
+}
+
+/* ===== クリック可能なおすすめタスク ===== */
+
+.daily-task-clickable {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.daily-task-clickable:hover {
+  background-color: #eff6ff;
+}
+
+.daily-task-clickable:focus-visible {
+  outline: 3px solid #60a5fa;
+  outline-offset: 2px;
+}
+
+/* ===== 移動先のタスクを強調 ===== */
+
+.task-highlight {
+  animation: taskHighlight 2s ease-out;
+}
+
+@keyframes taskHighlight {
+  0% {
+    background-color: #bfdbfe;
+    box-shadow: 0 0 0 4px #93c5fd;
+  }
+
+  100% {
+    background-color: transparent;
+    box-shadow: none;
+  }
+}
+
+/* ===== TaskFlow 新しいホームレイアウト ===== */
+
+/* メインコンテンツの横幅を広げる */
+.app-container {
+  max-width: 1600px;
+  width: calc(100% - 48px);
+  margin: 0 auto;
+}
+
+/* 左右2カラム */
+.taskflow-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+/* 左側：タスク追加 */
+.taskflow-sidebar {
+  position: sticky;
+  top: 20px;
+  min-width: 0;
+}
+
+/* 右側：今日のプランなど */
+.taskflow-main {
+  min-width: 0;
+}
+
+/* 進行中のタスクを右側いっぱいに表示 */
+.taskflow-main .app-layout {
+  display: block;
+}
+
+.taskflow-main .task-list-panel {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* スマホ・狭い画面では縦並び */
+@media (max-width: 900px) {
+  .app-container {
+    width: calc(100% - 32px);
+  }
+
+  .taskflow-layout {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .taskflow-sidebar {
+    position: static;
+  }
+}
+
+/* ===== 左側の達成履歴 ===== */
+
+.taskflow-sidebar .completed-details {
+  margin-top: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.taskflow-sidebar .completed-details summary {
+  cursor: pointer;
+  padding: 16px;
+
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+
+  font-size: 14px;
+  font-weight: bold;
+  color: #374151;
+}
+
+.taskflow-sidebar .completed-details summary:hover {
+  background-color: #f8fafc;
+}
+
+.taskflow-sidebar .completed-details[open] summary {
+  border-radius: 12px 12px 0 0;
+}
+
+.taskflow-sidebar .completed-details #completedList {
+  margin: 0;
+  padding: 12px;
+
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+
+  list-style: none;
+
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.taskflow-sidebar .completed-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  padding: 10px 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.taskflow-sidebar .completed-item:last-child {
+  border-bottom: none;
+}
+
+.taskflow-sidebar .completed-item strong {
+  font-size: 13px;
+  color: #166534;
+  overflow-wrap: anywhere;
+}
+
+.taskflow-sidebar .completed-item small {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.taskflow-sidebar .completed-empty {
+  padding: 12px 4px;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* ===== 達成履歴プレビュー ===== */
+
+.taskflow-sidebar .completed-preview {
+  margin-top: 20px;
+  padding: 18px;
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.taskflow-sidebar .completed-preview h2 {
+  margin-top: 0;
+  margin-bottom: 16px;
+  font-size: 17px;
+}
+
+.taskflow-sidebar .completed-preview #completedList {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+
+  max-height: none;
+  overflow: visible;
+}
+
+.taskflow-sidebar .completed-preview .completed-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  padding: 12px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.taskflow-sidebar .completed-preview .completed-item strong {
+  font-size: 13px;
+  color: #166534;
+  overflow-wrap: anywhere;
+}
+
+.taskflow-sidebar .completed-preview .completed-item small {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.taskflow-sidebar .completed-preview .view-all-button {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.taskflow-sidebar .completed-preview .view-all-button[hidden] {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .app-container { width: 100%; }
+  .taskflow-layout { padding: 0; }
+  .task-form input, .task-form select,
+  .control-field input, .control-field select,
+  .edit-modal-content input, .edit-modal-content select,
+  #reviewMemo { font-size: 16px; min-width: 0; }
+  button, li button, .migrate-button { min-height: 44px; }
+  .daily-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .summary-card { min-width: 0; }
+  .summary-card span { overflow-wrap: anywhere; }
+  .review-remaining-item span { overflow-wrap: anywhere; min-width: 0; }
+  .edit-modal { padding: 12px; }
+  .edit-modal-content { padding: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .task-highlight { animation: none; outline: 3px solid #93c5fd; }
+}
