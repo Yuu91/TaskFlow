@@ -7,6 +7,20 @@
 .pwa-status { max-width: 1200px; margin: 12px auto; font-size: 13px; color: #555; }
 .pwa-status button { margin: 8px; }
 .pwa-status button[hidden] { display: none; }
+.task-form .deadline-option, .edit-modal-content .deadline-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.task-form .deadline-option input, .edit-modal-content .deadline-option input {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  padding: 0;
+}
+input[type="date"]:disabled { opacity: 0.5; }
+.daily-task-info .suggestion-label { color: #2563eb; font-weight: bold; }
 
 /* データ管理と狭い画面での操作 */
 .backup-controls, #storageMessage {

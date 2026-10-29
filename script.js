@@ -40,6 +40,13 @@ const taskFilter = document.getElementById("taskFilter");
 const emptyTaskMessage = document.getElementById("emptyTaskMessage");
 
 const deadlineInput = document.getElementById("deadlineInput");
+const noDeadlineInput = document.getElementById("noDeadlineInput");
+const editNoDeadlineInput = document.getElementById("editNoDeadlineInput");
+function syncDeadlineInput(checkbox, input) {
+  input.disabled = checkbox.checked;
+}
+noDeadlineInput.addEventListener("change", () => syncDeadlineInput(noDeadlineInput, deadlineInput));
+editNoDeadlineInput.addEventListener("change", () => syncDeadlineInput(editNoDeadlineInput, editDeadlineInput));
 const priorityInput = document.getElementById("priorityInput");
 const sizeInput = document.getElementById("sizeInput");
 
@@ -227,7 +234,7 @@ addButton.addEventListener("click", function () {
   const newTask = {
     id: globalThis.crypto?.randomUUID?.() ?? createTaskId(),
     title: title,
-    deadline: deadlineInput.value,
+    deadline: noDeadlineInput.checked ? "" : deadlineInput.value,
     priority: priorityInput.value,
     size: sizeInput.value,
     progress: 0,
@@ -240,6 +247,8 @@ addButton.addEventListener("click", function () {
 
   taskInput.value = "";
   deadlineInput.value = "";
+  noDeadlineInput.checked = false;
+  syncDeadlineInput(noDeadlineInput, deadlineInput);
   priorityInput.value = "medium";
   sizeInput.value = "normal";
 
@@ -287,6 +296,8 @@ function editTask(id) {
   // 現在の設定をフォームに反映
   editTaskInput.value = task.title;
   editDeadlineInput.value = task.deadline || "";
+  editNoDeadlineInput.checked = !task.deadline;
+  syncDeadlineInput(editNoDeadlineInput, editDeadlineInput);
   editPriorityInput.value = task.priority || "medium";
   editSizeInput.value = task.size || "normal";
 
@@ -320,7 +331,7 @@ saveEditButton.addEventListener("click", function () {
 
   // 編集内容を反映
   task.title = newTitle;
-  task.deadline = editDeadlineInput.value;
+  task.deadline = editNoDeadlineInput.checked ? "" : editDeadlineInput.value;
   task.priority = editPriorityInput.value;
   task.size = editSizeInput.value;
 
@@ -560,7 +571,7 @@ function createTaskCard(task) {
 
   details.textContent =
     "締切：" +
-    (task.deadline || "未設定") +
+    (task.deadline || "なし") +
     " | 重要度：" +
     (priorityLabels[task.priority] || "未設定") +
     " | 作業規模：" +
@@ -857,11 +868,17 @@ function categorizeTasksByDate() {
     today: [],
     tomorrow: [],
     week: [],
+    suggestions: [],
   };
+  const unscheduled = [];
 
   const activeTasks = tasks.filter((task) => !task.completed);
 
   activeTasks.forEach(function (task) {
+    if (!task.deadline && !task.plannedDate) {
+      unscheduled.push(task);
+      return;
+    }
     // 手動で移行した予定日があれば優先する
     const startDate = task.plannedDate || calculateStartDate(task);
 
@@ -882,6 +899,8 @@ function categorizeTasksByDate() {
     }
   });
 
+  const available = Math.max(0, 3 - result.today.length);
+  result.suggestions = sortByRecommendation(unscheduled).slice(0, available);
   return result;
 }
 
@@ -1014,6 +1033,12 @@ function displayDailyPlan() {
   todayTasks.forEach(function (task) {
     todayTaskList.appendChild(createDailyTaskItem(task));
   });
+  categorized.suggestions.forEach(task => {
+    todayTaskList.appendChild(createDailyTaskItem(task, true));
+  });
+  if (categorized.suggestions.length > 0) {
+    todayCount.textContent = `${todayTasks.length}件＋おすすめ${categorized.suggestions.length}件`;
+  }
 
   // 明日のタスク
   tomorrowTasks.forEach(function (task) {
@@ -1025,7 +1050,7 @@ function displayDailyPlan() {
     weekTaskList.appendChild(createDailyTaskItem(task));
   });
 
-  todayEmptyMessage.hidden = todayTasks.length !== 0;
+  todayEmptyMessage.hidden = todayTasks.length + categorized.suggestions.length !== 0;
 }
 
 /* ===== 今日のプラン用の小さなカード ===== */
@@ -1066,7 +1091,7 @@ function jumpToTaskCard(id) {
   target.classList.add("task-highlight");
 }
 
-function createDailyTaskItem(task) {
+function createDailyTaskItem(task, isSuggestion = false) {
   const li = document.createElement("li");
   li.className = "daily-task-item";
 
@@ -1107,6 +1132,12 @@ function createDailyTaskItem(task) {
 
   info.appendChild(title);
   info.appendChild(details);
+  if (isSuggestion) {
+    const hint = document.createElement("small");
+    hint.className = "suggestion-label";
+    hint.textContent = "余裕があれば";
+    info.appendChild(hint);
+  }
 
   // 優先スコア
   const score = document.createElement("span");
