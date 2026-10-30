@@ -23,12 +23,13 @@
     </div>
     <p id="storageMessage" role="status" hidden></p>
     <section class="backup-controls" aria-label="データ管理">
-      <button id="exportButton" type="button" aria-controls="backupPreview">バックアップを作成・保存</button>
+      <button id="exportButton" type="button" aria-controls="backupPreview" aria-expanded="false">バックアップを作成・保存</button>
       <button id="importButton" type="button">バックアップから復元</button>
       <input id="importFile" type="file" accept=".json,application/json" hidden />
       <p>復元すると現在の全データを置き換えます。先にバックアップを保存してください。</p>
       <div id="backupPreview" class="info-panel" hidden>
         <h2>データの控えを保存する</h2>
+        <button id="closeBackupButton" type="button">閉じる</button>
         <p id="backupSummary"></p>
         <ul id="backupTaskPreview"></ul>
         <button id="shareBackupButton" type="button" hidden>共有メニューから保存</button>
@@ -62,8 +63,7 @@
       </details>
     </section>
     <div class="category-controls">
-      <label for="categoryFilter">表示する分類</label>
-      <select id="categoryFilter"><option value="">すべて</option><option value="__uncategorized">未分類</option></select>
+      <div id="categoryTabs" class="category-tabs" role="group" aria-label="表示するタスクの分類"></div>
       <span id="categoryStatus" role="status"></span>
     </div>
     <datalist id="categoryOptions"><option value="大学"></option><option value="仕事"></option><option value="私生活"></option><option value="生活"></option></datalist>

@@ -53,7 +53,7 @@ const plannedDateInput = document.getElementById("plannedDateInput");
 const categoryInput = document.getElementById("categoryInput");
 const editPlannedDateInput = document.getElementById("editPlannedDateInput");
 const editCategoryInput = document.getElementById("editCategoryInput");
-const categoryFilter = document.getElementById("categoryFilter");
+let selectedCategory = "";
 
 /* ===== 編集フォーム用 ===== */
 
@@ -1270,22 +1270,31 @@ function displayTasks() {
 }
 
 function getVisibleTasks() {
-  const selected = categoryFilter.value;
+  const selected = selectedCategory;
   return tasks.filter(task => !selected || (selected === "__uncategorized"
     ? !task.category : `category:${task.category}` === selected));
 }
 
 function refreshCategoryOptions() {
-  const selected = categoryFilter.value;
+  const selected = selectedCategory;
   const categories = [...new Set(tasks.map(task => task.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ja"));
-  categoryFilter.innerHTML = "";
+  selectedCategory = selected === "__uncategorized" || categories.some(name => `category:${name}` === selected) ? selected : "";
+  const tabs = document.getElementById("categoryTabs");
+  const hadFocus = tabs.contains(document.activeElement);
+  tabs.innerHTML = "";
   for (const [value, label] of [["", "すべて"], ["__uncategorized", "未分類"], ...categories.map(name => [`category:${name}`, name])]) {
-    const option = document.createElement("option");
-    option.value = value;
-    option.textContent = label;
-    categoryFilter.appendChild(option);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.className = "category-tab";
+    button.setAttribute("aria-pressed", String(value === selectedCategory));
+    button.addEventListener("click", () => {
+      selectedCategory = value;
+      displayTasks();
+    });
+    tabs.appendChild(button);
+    if (hadFocus && value === selectedCategory) button.focus();
   }
-  categoryFilter.value = selected === "__uncategorized" || categories.some(name => `category:${name}` === selected) ? selected : "";
   const options = document.getElementById("categoryOptions");
   options.innerHTML = "";
   for (const name of new Set(["大学", "仕事", "私生活", "生活", ...categories])) {
@@ -1293,11 +1302,10 @@ function refreshCategoryOptions() {
     option.value = name;
     options.appendChild(option);
   }
-  document.getElementById("categoryStatus").textContent = categoryFilter.value
-    ? `「${categoryFilter.value === "__uncategorized" ? "未分類" : categoryFilter.value.slice(9)}」のタスクを表示中。振り返りメモとバックアップは全分類共通です。`
+  document.getElementById("categoryStatus").textContent = selectedCategory
+    ? `「${selectedCategory === "__uncategorized" ? "未分類" : selectedCategory.slice(9)}」のタスクを表示中。振り返りメモとバックアップは全分類共通です。`
     : "すべての分類を表示中";
 }
-categoryFilter.addEventListener("change", displayTasks);
 
 /* ===== 画面切り替え ===== */
 
@@ -1393,6 +1401,7 @@ document.getElementById("exportButton").addEventListener("click", () => {
   // プレビュー時点の内容を固定し、表示件数と書き出す内容を一致させる。
   preparedBackup = JSON.parse(JSON.stringify({ app: "TaskFlow", version: 1, exportedAt: new Date().toISOString(), tasks, dailyReviews: reviews }));
   document.getElementById("backupPreview").hidden = false;
+  document.getElementById("exportButton").setAttribute("aria-expanded", "true");
   document.getElementById("backupSummary").textContent = `${new Date(preparedBackup.exportedAt).toLocaleString("ja-JP")} 時点：全分類のタスク${tasks.length}件、振り返り${Object.keys(reviews).length}日分。未保存の振り返りメモも含みます。`;
   const preview = document.getElementById("backupTaskPreview");
   preview.innerHTML = "";
@@ -1410,6 +1419,12 @@ document.getElementById("exportButton").addEventListener("click", () => {
   try { canShare = Boolean(navigator.share && navigator.canShare?.({ files: [makeBackupFile(preparedBackup)] })); } catch (_) { /* ダウンロードを案内 */ }
   document.getElementById("shareBackupButton").hidden = !canShare;
   document.getElementById("backupSaveStatus").textContent = "まだファイルには保存していません。下の保存方法を選んでください。";
+});
+document.getElementById("closeBackupButton").addEventListener("click", () => {
+  document.getElementById("backupPreview").hidden = true;
+  document.getElementById("exportButton").setAttribute("aria-expanded", "false");
+  preparedBackup = null;
+  document.getElementById("exportButton").focus();
 });
 document.getElementById("downloadBackupButton").addEventListener("click", () => {
   if (!preparedBackup) return;

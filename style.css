@@ -33,6 +33,10 @@ input[type="date"]:disabled { opacity: 0.5; }
 #backupTaskPreview { max-height: 200px; overflow-y: auto; }
 .category-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .category-controls select { padding: 10px; font-size: 16px; max-width: 100%; min-height: 44px; }
+.category-tabs { display: flex; gap: 8px; flex-wrap: wrap; width: 100%; }
+.category-tab { min-height: 44px; max-width: 100%; overflow-wrap: anywhere; background: white; color: #2563eb; border: 1px solid #d5dbe5; }
+.category-tab[aria-pressed="true"] { background: #2563eb; color: white; border-color: #2563eb; font-weight: bold; }
+.category-tab:focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; }
 #categoryStatus { font-size: 13px; width: 100%; }
 
 /* データ管理と狭い画面での操作 */
