@@ -49,6 +49,11 @@ noDeadlineInput.addEventListener("change", () => syncDeadlineInput(noDeadlineInp
 editNoDeadlineInput.addEventListener("change", () => syncDeadlineInput(editNoDeadlineInput, editDeadlineInput));
 const priorityInput = document.getElementById("priorityInput");
 const sizeInput = document.getElementById("sizeInput");
+const plannedDateInput = document.getElementById("plannedDateInput");
+const categoryInput = document.getElementById("categoryInput");
+const editPlannedDateInput = document.getElementById("editPlannedDateInput");
+const editCategoryInput = document.getElementById("editCategoryInput");
+const categoryFilter = document.getElementById("categoryFilter");
 
 /* ===== 編集フォーム用 ===== */
 
@@ -113,6 +118,7 @@ function validateData(data) {
         typeof task.completed !== "boolean" ||
         (task.completedAt != null && (typeof task.completedAt !== "string" || Number.isNaN(Date.parse(task.completedAt)))) ||
         (task.plannedDate != null && !validDate(task.plannedDate)) ||
+        (task.category != null && (typeof task.category !== "string" || task.category.length > 40)) ||
         (task.migrationCount != null && (!Number.isSafeInteger(task.migrationCount) || task.migrationCount < 0))) throw new Error("Invalid task");
     ids.add(task.id);
     if (task.migrationUndo != null) {
@@ -234,6 +240,8 @@ addButton.addEventListener("click", function () {
   const newTask = {
     id: globalThis.crypto?.randomUUID?.() ?? createTaskId(),
     title: title,
+    plannedDate: plannedDateInput.value || null,
+    category: categoryInput.value.trim(),
     deadline: noDeadlineInput.checked ? "" : deadlineInput.value,
     priority: priorityInput.value,
     size: sizeInput.value,
@@ -247,6 +255,8 @@ addButton.addEventListener("click", function () {
 
   taskInput.value = "";
   deadlineInput.value = "";
+  plannedDateInput.value = "";
+  categoryInput.value = "";
   noDeadlineInput.checked = false;
   syncDeadlineInput(noDeadlineInput, deadlineInput);
   priorityInput.value = "medium";
@@ -296,6 +306,8 @@ function editTask(id) {
   // 現在の設定をフォームに反映
   editTaskInput.value = task.title;
   editDeadlineInput.value = task.deadline || "";
+  editPlannedDateInput.value = task.plannedDate || "";
+  editCategoryInput.value = task.category || "";
   editNoDeadlineInput.checked = !task.deadline;
   syncDeadlineInput(editNoDeadlineInput, editDeadlineInput);
   editPriorityInput.value = task.priority || "medium";
@@ -306,6 +318,8 @@ function editTask(id) {
   editModal.hidden = false;
   document.querySelector("main").inert = true;
   document.querySelector(".backup-controls").inert = true;
+  document.querySelector(".app-guides").inert = true;
+  document.querySelector(".category-controls").inert = true;
   document.body.classList.add("modal-open");
   editTaskInput.focus();
 }
@@ -328,17 +342,18 @@ saveEditButton.addEventListener("click", function () {
 
   const oldDeadline = task.deadline || "";
   const oldSize = task.size || "normal";
+  const oldPlannedDate = task.plannedDate || "";
 
   // 編集内容を反映
   task.title = newTitle;
   task.deadline = editNoDeadlineInput.checked ? "" : editDeadlineInput.value;
   task.priority = editPriorityInput.value;
   task.size = editSizeInput.value;
+  task.plannedDate = editPlannedDateInput.value || null;
+  task.category = editCategoryInput.value.trim();
 
-  // 締切や作業規模が変わったら
-  // 手動の移行予定日をリセット
-  if (oldDeadline !== task.deadline || oldSize !== task.size) {
-    task.plannedDate = null;
+  // 手動予定日は編集内容を維持し、変更前の移行履歴だけを無効にする。
+  if (oldDeadline !== task.deadline || oldSize !== task.size || oldPlannedDate !== (task.plannedDate || "")) {
     delete task.migrationUndo;
   }
 
@@ -582,6 +597,11 @@ function createTaskCard(task) {
 
   taskInfo.appendChild(title);
   taskInfo.appendChild(details);
+  if (task.category) {
+    const category = document.createElement("small");
+    category.textContent = `分類：${task.category}`;
+    taskInfo.appendChild(category);
+  }
 
   // ===== 移行回数の表示 =====
 
@@ -726,7 +746,7 @@ function displayCompletedTasks() {
   completedList.innerHTML = "";
 
   // 最近完了した順に並べる
-  const completedTasks = tasks
+  const completedTasks = getVisibleTasks()
     .filter((task) => task.completed)
     .sort((a, b) => {
       const dateA = a.completedAt ? new Date(a.completedAt).getTime() : 0;
@@ -872,7 +892,7 @@ function categorizeTasksByDate() {
   };
   const unscheduled = [];
 
-  const activeTasks = tasks.filter((task) => !task.completed);
+  const activeTasks = getVisibleTasks().filter((task) => !task.completed);
 
   activeTasks.forEach(function (task) {
     if (!task.deadline && !task.plannedDate) {
@@ -910,7 +930,7 @@ function displayDailyReview() {
   const today = formatDate(new Date());
 
   // 今日完了したタスク
-  const completedToday = tasks.filter(function (task) {
+  const completedToday = getVisibleTasks().filter(function (task) {
     if (!task.completed || !task.completedAt) {
       return false;
     }
@@ -1066,6 +1086,7 @@ function jumpToTaskCard(id) {
   // 検索や絞り込みを解除する
   taskSearch.value = "";
   taskFilter.value = "all";
+  // 表示中の分類は維持する。
 
   // タスク一覧を再描画
   displayAllTasks();
@@ -1128,7 +1149,7 @@ function createDailyTaskItem(task, isSuggestion = false) {
   title.textContent = task.title;
 
   const details = document.createElement("small");
-  details.textContent = `締切：${task.deadline || "未設定"} | 進捗：${task.progress ?? 0}%`;
+  details.textContent = `締切：${task.deadline || "なし"} | 予定日：${task.plannedDate || "自動"} | 進捗：${task.progress ?? 0}%${task.category ? ` | ${task.category}` : ""}`;
 
   info.appendChild(title);
   info.appendChild(details);
@@ -1185,7 +1206,7 @@ function createDailyTaskItem(task, isSuggestion = false) {
 function displayHomeTasks() {
   taskList.innerHTML = "";
 
-  const activeTasks = tasks.filter((task) => !task.completed);
+  const activeTasks = getVisibleTasks().filter((task) => !task.completed);
   const sortedTasks = sortByDeadline(activeTasks);
 
   taskCount.textContent = `（全${activeTasks.length}件）`;
@@ -1204,7 +1225,7 @@ function displayHomeTasks() {
 function displayAllTasks() {
   allTasksList.innerHTML = "";
 
-  const activeTasks = tasks.filter((task) => !task.completed);
+  const activeTasks = getVisibleTasks().filter((task) => !task.completed);
 
   const keyword = taskSearch.value.trim().toLowerCase();
   const filterType = taskFilter.value;
@@ -1240,12 +1261,43 @@ function displayAllTasks() {
 /* ===== 全体の表示更新 ===== */
 
 function displayTasks() {
+  refreshCategoryOptions();
   displayHomeTasks();
   displayAllTasks();
   displayCompletedTasks();
   displayDailyPlan();
   displayDailyReview();
 }
+
+function getVisibleTasks() {
+  const selected = categoryFilter.value;
+  return tasks.filter(task => !selected || (selected === "__uncategorized"
+    ? !task.category : `category:${task.category}` === selected));
+}
+
+function refreshCategoryOptions() {
+  const selected = categoryFilter.value;
+  const categories = [...new Set(tasks.map(task => task.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ja"));
+  categoryFilter.innerHTML = "";
+  for (const [value, label] of [["", "すべて"], ["__uncategorized", "未分類"], ...categories.map(name => [`category:${name}`, name])]) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    categoryFilter.appendChild(option);
+  }
+  categoryFilter.value = selected === "__uncategorized" || categories.some(name => `category:${name}` === selected) ? selected : "";
+  const options = document.getElementById("categoryOptions");
+  options.innerHTML = "";
+  for (const name of new Set(["大学", "仕事", "私生活", "生活", ...categories])) {
+    const option = document.createElement("option");
+    option.value = name;
+    options.appendChild(option);
+  }
+  document.getElementById("categoryStatus").textContent = categoryFilter.value
+    ? `「${categoryFilter.value === "__uncategorized" ? "未分類" : categoryFilter.value.slice(9)}」のタスクを表示中。振り返りメモとバックアップは全分類共通です。`
+    : "すべての分類を表示中";
+}
+categoryFilter.addEventListener("change", displayTasks);
 
 /* ===== 画面切り替え ===== */
 
@@ -1287,6 +1339,8 @@ function closeEditModal() {
   editingTaskId = null;
   document.querySelector("main").inert = false;
   document.querySelector(".backup-controls").inert = false;
+  document.querySelector(".app-guides").inert = false;
+  document.querySelector(".category-controls").inert = false;
   document.body.classList.remove("modal-open");
   if (modalReturnFocus?.isConnected) modalReturnFocus.focus();
   else (currentScreen === "all" ? backButton : taskInput).focus();
@@ -1294,7 +1348,7 @@ function closeEditModal() {
 editModal.addEventListener("keydown", event => {
   if (event.key === "Escape") closeEditModal();
   if (event.key !== "Tab") return;
-  const fields = Array.from(editModal.querySelectorAll("input, select, button"));
+  const fields = Array.from(editModal.querySelectorAll("input:not(:disabled), select:not(:disabled), button:not(:disabled)"));
   const first = fields[0], last = fields[fields.length - 1];
   if (event.shiftKey && document.activeElement === first) {
     event.preventDefault(); last.focus();
@@ -1322,16 +1376,12 @@ window.addEventListener("beforeunload", event => {
   if (reviewDirty) { event.preventDefault(); event.returnValue = ""; }
 });
 
-function downloadBackup(data, suffix = "") {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `TaskFlow-${formatDate(new Date())}${suffix}.json`;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
+let preparedBackup = null;
+function backupFileName(data) {
+  return `TaskFlow-${data.exportedAt.replace(/[:.]/g, "-")}.json`;
+}
+function makeBackupFile(data) {
+  return new File([JSON.stringify(data, null, 2)], backupFileName(data), { type: "application/json" });
 }
 document.getElementById("exportButton").addEventListener("click", () => {
   if (storageBlocked) {
@@ -1340,7 +1390,56 @@ document.getElementById("exportButton").addEventListener("click", () => {
   }
   const reviews = { ...dailyReviews };
   if (reviewDirty) reviews[reviewDate] = { memo: reviewMemo.value.trim() };
-  downloadBackup({ app: "TaskFlow", version: 1, exportedAt: new Date().toISOString(), tasks, dailyReviews: reviews });
+  // プレビュー時点の内容を固定し、表示件数と書き出す内容を一致させる。
+  preparedBackup = JSON.parse(JSON.stringify({ app: "TaskFlow", version: 1, exportedAt: new Date().toISOString(), tasks, dailyReviews: reviews }));
+  document.getElementById("backupPreview").hidden = false;
+  document.getElementById("backupSummary").textContent = `${new Date(preparedBackup.exportedAt).toLocaleString("ja-JP")} 時点：全分類のタスク${tasks.length}件、振り返り${Object.keys(reviews).length}日分。未保存の振り返りメモも含みます。`;
+  const preview = document.getElementById("backupTaskPreview");
+  preview.innerHTML = "";
+  for (const task of preparedBackup.tasks.slice(0, 20)) {
+    const item = document.createElement("li");
+    item.textContent = `${task.completed ? "完了" : "未完了"}：${task.title}${task.category ? `（${task.category}）` : ""}`;
+    preview.appendChild(item);
+  }
+  if (tasks.length > 20) {
+    const more = document.createElement("li");
+    more.textContent = `ほか${tasks.length - 20}件（ファイルには全件保存します）`;
+    preview.appendChild(more);
+  }
+  let canShare = false;
+  try { canShare = Boolean(navigator.share && navigator.canShare?.({ files: [makeBackupFile(preparedBackup)] })); } catch (_) { /* ダウンロードを案内 */ }
+  document.getElementById("shareBackupButton").hidden = !canShare;
+  document.getElementById("backupSaveStatus").textContent = "まだファイルには保存していません。下の保存方法を選んでください。";
+});
+document.getElementById("downloadBackupButton").addEventListener("click", () => {
+  if (!preparedBackup) return;
+  const status = document.getElementById("backupSaveStatus");
+  try {
+    const file = makeBackupFile(preparedBackup);
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = file.name;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    status.textContent = `ダウンロードを開始しました。保存完了はアプリから確認できません。「ファイル」などの保存先に ${file.name} があるか確認してください。`;
+  } catch (_) {
+    status.textContent = "ファイルを作成できませんでした。Safariで開き直すか、共有メニューからの保存を試してください。";
+  }
+});
+document.getElementById("shareBackupButton").addEventListener("click", async () => {
+  if (!preparedBackup) return;
+  const status = document.getElementById("backupSaveStatus");
+  try {
+    await navigator.share({ files: [makeBackupFile(preparedBackup)] });
+    status.textContent = "共有操作が終了しました。「ファイルに保存」を選んだ場合は、ファイルアプリで保存を確認してください。";
+  } catch (error) {
+    status.textContent = error.name === "AbortError"
+      ? "保存・共有をキャンセルしました。もう一度保存方法を選べます。"
+      : "共有メニューを開けませんでした。「ファイルをダウンロード」を試すか、Safariで開き直してください。";
+  }
 });
 const importFile = document.getElementById("importFile");
 document.getElementById("importButton").addEventListener("click", () => importFile.click());

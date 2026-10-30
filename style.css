@@ -21,6 +21,19 @@
 }
 input[type="date"]:disabled { opacity: 0.5; }
 .daily-task-info .suggestion-label { color: #2563eb; font-weight: bold; }
+.app-guides, .category-controls { max-width: 1200px; margin: 16px auto; }
+.app-guides details, .info-panel { border: 1px solid #d5dbe5; border-radius: 10px; background: white; padding: 16px; margin: 10px 0; line-height: 1.7; overflow-wrap: anywhere; }
+.app-guides summary { cursor: pointer; font-weight: bold; min-height: 32px; }
+.app-guides ol { padding-left: 24px; }
+.app-guides li { margin: 8px 0; }
+.backup-controls .info-panel { width: 100%; }
+.info-panel[hidden] { display: none; }
+.info-panel h2 { margin-bottom: 8px; }
+.info-panel p { margin: 12px 0; }
+#backupTaskPreview { max-height: 200px; overflow-y: auto; }
+.category-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.category-controls select { padding: 10px; font-size: 16px; max-width: 100%; min-height: 44px; }
+#categoryStatus { font-size: 13px; width: 100%; }
 
 /* データ管理と狭い画面での操作 */
 .backup-controls, #storageMessage {

@@ -23,11 +23,50 @@
     </div>
     <p id="storageMessage" role="status" hidden></p>
     <section class="backup-controls" aria-label="データ管理">
-      <button id="exportButton" type="button">バックアップを保存</button>
+      <button id="exportButton" type="button" aria-controls="backupPreview">バックアップを作成・保存</button>
       <button id="importButton" type="button">バックアップから復元</button>
       <input id="importFile" type="file" accept=".json,application/json" hidden />
       <p>復元すると現在の全データを置き換えます。先にバックアップを保存してください。</p>
+      <div id="backupPreview" class="info-panel" hidden>
+        <h2>データの控えを保存する</h2>
+        <p id="backupSummary"></p>
+        <ul id="backupTaskPreview"></ul>
+        <button id="shareBackupButton" type="button" hidden>共有メニューから保存</button>
+        <button id="downloadBackupButton" type="button">ファイルをダウンロード</button>
+        <p>iPhoneでは「共有メニューから保存」→「ファイルに保存」を選びます。最後に「ファイル」アプリで、TaskFlowで始まるJSONファイルがあるか確認してください。</p>
+        <p>外部アプリを開く確認だけで終わる場合は、Safariまたはホーム画面のTaskFlowで開き直して試してください。ダウンロード後は「ファイル」アプリのダウンロード先を確認します。</p>
+        <p>このファイルは暗号化されていません。タスクやメモを含むため、保存先や共有相手に注意してください。</p>
+        <p id="backupSaveStatus" role="status"></p>
+      </div>
     </section>
+    <section class="app-guides" aria-label="使い方とデータについて">
+      <details>
+        <summary>使い方</summary>
+        <ol>
+          <li>タスク名を入力します。締切は終える期限、予定日は取り組む日です。どちらも任意です。</li>
+          <li>分類は「大学」「仕事」「私生活」などを選ぶか、自分で入力できます。上の分類欄で表示を切り替えます。</li>
+          <li>重要度と作業規模を選び、「タスクを追加」を押します。作業規模の目安は短い1日・普通2日・長い4日・かなり長い7日です。</li>
+          <li>予定日があればその日を優先し、なければ締切と残り作業量から着手日を提案します。締切を過ぎたものは今日に表示します。</li>
+          <li>締切・予定日がないタスクは、今日のタスクが少ないときだけ「余裕があれば」と表示します。それ以外も全タスク一覧で確認できます。</li>
+          <li>優先スコアは締切・重要度・残り作業量・進捗による目安です。進捗100％になっても、最後に「完了」を押します。</li>
+          <li>「明日へ移行」で予定を明日に変更できます。間違えたら「移行を取り消す」で戻せます。</li>
+          <li>タスクの変更は自動保存、振り返りメモは「振り返りを保存」で保存します。予定日に自動通知する機能はまだありません。</li>
+        </ol>
+      </details>
+      <details>
+        <summary>データの保存先・安全性・バックアップ</summary>
+        <p>入力したタスクとメモは、この端末のブラウザー・ホーム画面アプリ内に保存します。現在、タスクやメモをサーバーへ送る処理や、他の利用者との自動共有・端末間同期はありません。画面ファイルの取得や更新には通信します。</p>
+        <p>端末内保存は暗号化された保管庫として設計していません。共用端末や機密情報の登録には注意してください。端末の故障、サイトデータの削除、保存領域の整理などで失われる可能性があります。</p>
+        <p>バックアップは、タスクと振り返りメモの「控え」を端末の外にも残せるJSONファイルです。分類で絞っていても全データを含みます。定期的に保存し、公開リポジトリにはアップロードしないでください。</p>
+        <p>復元は、控えの内容で現在の全データを置き換える操作です。読み込む前に確認画面が出ます。URL・端末・起動方法によって保存先が異なる場合は、バックアップで移せます。</p>
+      </details>
+    </section>
+    <div class="category-controls">
+      <label for="categoryFilter">表示する分類</label>
+      <select id="categoryFilter"><option value="">すべて</option><option value="__uncategorized">未分類</option></select>
+      <span id="categoryStatus" role="status"></span>
+    </div>
+    <datalist id="categoryOptions"><option value="大学"></option><option value="仕事"></option><option value="私生活"></option><option value="生活"></option></datalist>
 
     <main class="app-container">
       <!-- ===== ホーム画面 ===== -->
@@ -50,6 +89,10 @@
                 <label for="deadlineInput">締切</label>
                 <input type="date" id="deadlineInput" />
                 <label class="deadline-option"><input type="checkbox" id="noDeadlineInput" />締切を決めない</label>
+                <label for="plannedDateInput">取り組む予定日（任意）</label>
+                <input type="date" id="plannedDateInput" />
+                <label for="categoryInput">分類（任意・自由入力）</label>
+                <input type="text" id="categoryInput" list="categoryOptions" maxlength="40" placeholder="大学・仕事・私生活など" />
 
                 <label for="priorityInput">重要度</label>
                 <select id="priorityInput">
@@ -262,6 +305,10 @@
         <label for="editDeadlineInput">締切</label>
         <input type="date" id="editDeadlineInput" />
         <label class="deadline-option"><input type="checkbox" id="editNoDeadlineInput" />締切を決めない</label>
+        <label for="editPlannedDateInput">取り組む予定日（任意）</label>
+        <input type="date" id="editPlannedDateInput" />
+        <label for="editCategoryInput">分類（任意・自由入力）</label>
+        <input type="text" id="editCategoryInput" list="categoryOptions" maxlength="40" />
 
         <label for="editPriorityInput">重要度</label>
         <select id="editPriorityInput">
