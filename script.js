@@ -1302,6 +1302,21 @@ function refreshCategoryOptions() {
     option.value = name;
     options.appendChild(option);
   }
+  for (const [containerId, input] of [["categorySuggestions", categoryInput], ["editCategorySuggestions", editCategoryInput]]) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = "";
+    for (const name of categories) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "category-suggestion";
+      button.textContent = name;
+      button.addEventListener("click", () => {
+        input.value = name;
+        input.focus();
+      });
+      container.appendChild(button);
+    }
+  }
   document.getElementById("categoryStatus").textContent = selectedCategory
     ? `「${selectedCategory === "__uncategorized" ? "未分類" : selectedCategory.slice(9)}」のタスクを表示中。振り返りメモとバックアップは全分類共通です。`
     : "すべての分類を表示中";
@@ -1314,6 +1329,8 @@ function showScreen(screen) {
 
   homeScreen.hidden = screen !== "home";
   allTasksScreen.hidden = screen !== "all";
+  document.getElementById(screen === "all" ? "allCategorySlot" : "homeCategorySlot")
+    .appendChild(document.querySelector(".category-controls"));
 
   window.scrollTo(0, 0);
 }
@@ -1490,6 +1507,15 @@ importFile.addEventListener("change", async () => {
     notifyStorage(`復元できませんでした。現在のデータは変更していません。${error.message}`);
   }
 });
+
+// 要素自体を移動し、表示件数やボタンの状態を維持する。
+const mobileLayout = window.matchMedia("(max-width: 900px)");
+function positionCompletedPanel() {
+  document.getElementById(mobileLayout.matches ? "mobileCompletedSlot" : "desktopCompletedSlot")
+    .appendChild(document.getElementById("completedPanel"));
+}
+positionCompletedPanel();
+mobileLayout.addEventListener("change", positionCompletedPanel);
 
 showScreen("home");
 displayTasks();

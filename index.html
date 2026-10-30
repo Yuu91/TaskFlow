@@ -62,10 +62,6 @@
         <p>復元は、控えの内容で現在の全データを置き換える操作です。読み込む前に確認画面が出ます。URL・端末・起動方法によって保存先が異なる場合は、バックアップで移せます。</p>
       </details>
     </section>
-    <div class="category-controls">
-      <div id="categoryTabs" class="category-tabs" role="group" aria-label="表示するタスクの分類"></div>
-      <span id="categoryStatus" role="status"></span>
-    </div>
     <datalist id="categoryOptions"><option value="大学"></option><option value="仕事"></option><option value="私生活"></option><option value="生活"></option></datalist>
 
     <main class="app-container">
@@ -93,6 +89,7 @@
                 <input type="date" id="plannedDateInput" />
                 <label for="categoryInput">分類（任意・自由入力）</label>
                 <input type="text" id="categoryInput" list="categoryOptions" maxlength="40" placeholder="大学・仕事・私生活など" />
+                <div id="categorySuggestions" class="category-suggestions" role="group" aria-label="既存の分類を選ぶ"></div>
 
                 <label for="priorityInput">重要度</label>
                 <select id="priorityInput">
@@ -118,7 +115,8 @@
             <!-- ===== 達成履歴 ===== -->
 
             <!-- ===== 達成履歴 ===== -->
-            <section class="completed-panel completed-preview">
+            <div id="desktopCompletedSlot">
+            <section id="completedPanel" class="completed-panel completed-preview">
               <h2>達成履歴</h2>
 
               <ul id="completedList"></ul>
@@ -132,6 +130,7 @@
                 すべての達成タスクを見る
               </button>
             </section>
+            </div>
           </aside>
 
           <!-- 右側：メインコンテンツ -->
@@ -232,11 +231,18 @@
             </section>
 
             <!-- ===== 進行中のタスク ===== -->
+            <div id="mobileCompletedSlot"></div>
             <section class="task-list-panel">
               <h2>
                 進行中のタスク
                 <span id="taskCount"></span>
               </h2>
+              <div id="homeCategorySlot">
+                <div class="category-controls">
+                  <div id="categoryTabs" class="category-tabs" role="group" aria-label="表示するタスクの分類"></div>
+                  <span id="categoryStatus" role="status"></span>
+                </div>
+              </div>
 
               <ul id="taskList"></ul>
 
@@ -263,6 +269,7 @@
         </div>
 
         <!-- 検索・並び替え・絞り込み -->
+        <div id="allCategorySlot"></div>
         <div class="task-controls">
           <div class="control-field">
             <label for="taskSearch">タスクを検索</label>
@@ -309,6 +316,7 @@
         <input type="date" id="editPlannedDateInput" />
         <label for="editCategoryInput">分類（任意・自由入力）</label>
         <input type="text" id="editCategoryInput" list="categoryOptions" maxlength="40" />
+        <div id="editCategorySuggestions" class="category-suggestions" role="group" aria-label="既存の分類を選ぶ"></div>
 
         <label for="editPriorityInput">重要度</label>
         <select id="editPriorityInput">

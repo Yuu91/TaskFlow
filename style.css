@@ -37,6 +37,10 @@ input[type="date"]:disabled { opacity: 0.5; }
 .category-tab { min-height: 44px; max-width: 100%; overflow-wrap: anywhere; background: white; color: #2563eb; border: 1px solid #d5dbe5; }
 .category-tab[aria-pressed="true"] { background: #2563eb; color: white; border-color: #2563eb; font-weight: bold; }
 .category-tab:focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; }
+.category-suggestions { display: flex; flex-wrap: wrap; gap: 6px; }
+.category-suggestion { background: #eff6ff; color: #2563eb; border: 1px solid #d5dbe5; min-height: 44px; padding: 8px 12px; max-width: 100%; overflow-wrap: anywhere; }
+#mobileCompletedSlot .completed-preview { background: white; padding: 18px; border: 1px solid #e5e7eb; border-radius: 12px; margin: 0 0 24px; }
+#mobileCompletedSlot .completed-item { overflow-wrap: anywhere; }
 #categoryStatus { font-size: 13px; width: 100%; }
 
 /* データ管理と狭い画面での操作 */
