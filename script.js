@@ -1402,6 +1402,8 @@ window.addEventListener("beforeunload", event => {
 });
 
 let preparedBackup = null;
+// アプリ内ブラウザーの検出は補助。検出されない環境にも文章コピーを用意する。
+const isLineBrowser = /\bLine\//i.test(navigator.userAgent || "");
 function backupFileName(data) {
   return `TaskFlow-${data.exportedAt.replace(/[:.]/g, "-")}.json`;
 }
@@ -1434,17 +1436,24 @@ document.getElementById("exportButton").addEventListener("click", () => {
   }
   let canShare = false;
   try { canShare = Boolean(navigator.share && navigator.canShare?.({ files: [makeBackupFile(preparedBackup)] })); } catch (_) { /* ダウンロードを案内 */ }
-  document.getElementById("shareBackupButton").hidden = !canShare;
-  document.getElementById("backupSaveStatus").textContent = "まだファイルには保存していません。下の保存方法を選んでください。";
+  document.getElementById("shareBackupButton").hidden = isLineBrowser || !canShare;
+  document.getElementById("downloadBackupButton").hidden = isLineBrowser;
+  document.getElementById("lineBackupNotice").hidden = !isLineBrowser;
+  document.getElementById("backupTextDetails").open = isLineBrowser;
+  document.getElementById("backupText").value = JSON.stringify(preparedBackup, null, 2);
+  document.getElementById("backupSaveStatus").textContent = isLineBrowser
+    ? "LINE内で開いています。まずバックアップ全文をコピーしてください。コピーだけではファイル保存は完了しません。"
+    : "まだファイルには保存していません。下の保存方法を選んでください。";
 });
 document.getElementById("closeBackupButton").addEventListener("click", () => {
   document.getElementById("backupPreview").hidden = true;
   document.getElementById("exportButton").setAttribute("aria-expanded", "false");
   preparedBackup = null;
+  document.getElementById("backupText").value = "";
   document.getElementById("exportButton").focus();
 });
 document.getElementById("downloadBackupButton").addEventListener("click", () => {
-  if (!preparedBackup) return;
+  if (!preparedBackup || isLineBrowser) return;
   const status = document.getElementById("backupSaveStatus");
   try {
     const file = makeBackupFile(preparedBackup);
@@ -1462,7 +1471,7 @@ document.getElementById("downloadBackupButton").addEventListener("click", () => 
   }
 });
 document.getElementById("shareBackupButton").addEventListener("click", async () => {
-  if (!preparedBackup) return;
+  if (!preparedBackup || isLineBrowser) return;
   const status = document.getElementById("backupSaveStatus");
   try {
     await navigator.share({ files: [makeBackupFile(preparedBackup)] });
@@ -1473,6 +1482,21 @@ document.getElementById("shareBackupButton").addEventListener("click", async () 
       : "共有メニューを開けませんでした。「ファイルをダウンロード」を試すか、Safariで開き直してください。";
   }
 });
+document.getElementById("copyBackupButton").addEventListener("click", async () => {
+  if (!preparedBackup) return;
+  const text = document.getElementById("backupText");
+  const status = document.getElementById("backupSaveStatus");
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+    await navigator.clipboard.writeText(text.value);
+    status.textContent = "バックアップ全文をコピーしました。メモアプリへ貼り付けて保管するか、移動先のTaskFlowで文章から復元してください。まだファイル保存はしていません。";
+  } catch (_) {
+    text.focus();
+    text.select();
+    text.setSelectionRange(0, text.value.length);
+    status.textContent = "自動コピーできませんでした。文章欄を長押しし、全選択してコピーしてください。全文がコピーできたことを貼り付け先で確認してください。";
+  }
+});
 const importFile = document.getElementById("importFile");
 document.getElementById("importButton").addEventListener("click", () => importFile.click());
 importFile.addEventListener("change", async () => {
@@ -1481,7 +1505,20 @@ importFile.addEventListener("change", async () => {
   if (!file) return;
   try {
     if (file.size > 5 * 1024 * 1024) throw new Error("ファイルは5MB以下にしてください。");
-    const data = JSON.parse(await file.text());
+    restoreBackupText(await file.text());
+  } catch (error) {
+    notifyStorage(`ファイルを読み込めませんでした。現在のデータは変更していません。${error.message}`);
+  }
+});
+document.getElementById("importTextButton").addEventListener("click", () => {
+  if (restoreBackupText(document.getElementById("importBackupText").value)) {
+    document.getElementById("importBackupText").value = "";
+  }
+});
+function restoreBackupText(text) {
+  try {
+    if (new Blob([text]).size > 5 * 1024 * 1024) throw new Error("バックアップは5MB以下にしてください。");
+    const data = JSON.parse(text);
     if (data.app !== "TaskFlow" || data.version !== 1) throw new Error("対応するTaskFlowのバックアップではありません。");
     validateData(data);
     if (!confirm(`タスク${data.tasks.length}件、振り返り${Object.keys(data.dailyReviews).length}日分を復元します。現在の全データと未保存メモを置き換えますか？`)) return;
@@ -1503,10 +1540,12 @@ importFile.addEventListener("change", async () => {
     loadTodayReview();
     displayTasks();
     notifyStorage("バックアップを復元しました。復元前のデータはブラウザー内に退避しています。");
+    return true;
   } catch (error) {
     notifyStorage(`復元できませんでした。現在のデータは変更していません。${error.message}`);
+    return false;
   }
-});
+}
 
 // 要素自体を移動し、表示件数やボタンの状態を維持する。
 const mobileLayout = window.matchMedia("(max-width: 900px)");

@@ -31,6 +31,9 @@ input[type="date"]:disabled { opacity: 0.5; }
 .info-panel h2 { margin-bottom: 8px; }
 .info-panel p { margin: 12px 0; }
 #backupTaskPreview { max-height: 200px; overflow-y: auto; }
+#backupText, #importBackupText { width: 100%; padding: 10px; font-size: 16px; box-sizing: border-box; }
+#lineBackupNotice { padding: 12px; margin: 12px 0; background: #fff3cd; }
+#lineBackupNotice[hidden], #downloadBackupButton[hidden] { display: none; }
 .category-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 .category-controls select { padding: 10px; font-size: 16px; max-width: 100%; min-height: 44px; }
 .category-tabs { display: flex; gap: 8px; flex-wrap: wrap; width: 100%; }

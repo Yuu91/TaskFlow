@@ -27,6 +27,13 @@
       <button id="importButton" type="button">バックアップから復元</button>
       <input id="importFile" type="file" accept=".json,application/json" hidden />
       <p>復元すると現在の全データを置き換えます。先にバックアップを保存してください。</p>
+      <details class="info-panel">
+        <summary>コピーした文章から復元する</summary>
+        <p>別のブラウザーから持ち出したバックアップ全文を貼り付けてください。現在の全データを置き換える前に確認します。</p>
+        <label for="importBackupText">バックアップ全文（JSON）</label>
+        <textarea id="importBackupText" rows="5" spellcheck="false" autocapitalize="off"></textarea>
+        <button id="importTextButton" type="button">この文章から復元する</button>
+      </details>
       <div id="backupPreview" class="info-panel" hidden>
         <h2>データの控えを保存する</h2>
         <button id="closeBackupButton" type="button">閉じる</button>
@@ -34,6 +41,22 @@
         <ul id="backupTaskPreview"></ul>
         <button id="shareBackupButton" type="button" hidden>共有メニューから保存</button>
         <button id="downloadBackupButton" type="button">ファイルをダウンロード</button>
+        <div id="lineBackupNotice" hidden>
+          <p>LINE内ブラウザーではファイル保存が動かない場合があります。この画面では文章のコピーでデータを持ち出してください。</p>
+          <ol>
+            <li>下の「バックアップ全文をコピー」を押します。失敗したら文章欄を長押しして全選択・コピーします。</li>
+            <li>LINEのメニューから外部ブラウザー（iPhoneはSafariなど）で同じURLを開きます。</li>
+            <li>「コピーした文章から復元する」に全文を貼り付け、確認して復元します。その後、ファイルとして保存できます。</li>
+          </ol>
+          <p>LINE内とSafari・ホーム画面アプリでは保存場所が異なる場合があります。新しい画面でタスクを確認するまで、元のデータを削除しないでください。復元先に既存タスクがある場合は先にそちらもバックアップしてください。</p>
+        </div>
+        <details id="backupTextDetails">
+          <summary>保存できない場合：バックアップを文章でコピー</summary>
+          <p>全文をコピーしてメモアプリなどに保管できます。共有相手に内容を読まれるため、グループトークなどには送らないでください。</p>
+          <label for="backupText">バックアップ全文（変更せずにコピー）</label>
+          <textarea id="backupText" rows="5" readonly spellcheck="false"></textarea>
+          <button id="copyBackupButton" type="button">バックアップ全文をコピー</button>
+        </details>
         <p>iPhoneでは「共有メニューから保存」→「ファイルに保存」を選びます。最後に「ファイル」アプリで、TaskFlowで始まるJSONファイルがあるか確認してください。</p>
         <p>外部アプリを開く確認だけで終わる場合は、Safariまたはホーム画面のTaskFlowで開き直して試してください。ダウンロード後は「ファイル」アプリのダウンロード先を確認します。</p>
         <p>このファイルは暗号化されていません。タスクやメモを含むため、保存先や共有相手に注意してください。</p>
