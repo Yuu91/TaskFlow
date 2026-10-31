@@ -1297,6 +1297,19 @@ body:has(#allTasksScreen:not([hidden]) #bulkActions:not([hidden])) {
 }
 body:has(#allTasksScreen:not([hidden]) #bulkActions:not([hidden])) .completion-undo { bottom: auto; top: calc(12px + env(safe-area-inset-top)); }
 .list-pagination { justify-content: center; }
+.count-explanation { font-size: 12px; color: #64748b; line-height: 1.7; margin: 8px 0; }
+.count-explanation summary { cursor: pointer; padding: 6px 0; }
+.count-explanation p { margin: 6px 0; }
+#toggleSelectionButton { border: 1px solid #2563eb; background: #eff6ff; color: #1d4ed8; min-height: 44px; }
+#toggleSelectionButton[aria-pressed="true"] { background: #1d4ed8; color: white; border-color: #1d4ed8; }
+#allTasksList .task-selection { padding: 10px; border-radius: 8px; background: #eff6ff; color: #1e40af; border: 1px solid #93c5fd; font-weight: bold; }
+.task-selection input { accent-color: #1d4ed8; }
+#allTasksList > li.task-selected { border: 2px solid #2563eb; background: #f5f9ff; }
+.bulk-actions:not([hidden]) { background: #eff6ff; color: #1e3a8a; border: 2px solid #2563eb; }
+.bulk-selection-controls button { background: white; color: #1d4ed8; border: 1px solid #2563eb; }
+#selectionCount { background: #1d4ed8; color: white; border-radius: 6px; padding: 8px 10px; }
+#bulkMigrateButton { background: #1d4ed8; color: white; }
+.bulk-task-buttons button:disabled { opacity: 1; background: #dbe3ee !important; color: #475569 !important; cursor: default; }
 .list-pagination button:disabled { opacity: .45; cursor: default; }
 #allTasksList.compact-list > li { padding: 12px; gap: 6px; margin-bottom: 8px; }
 #allTasksList.compact-list > li > .task-info { flex-direction: row; align-items: center; gap: 10px; flex-wrap: wrap; }

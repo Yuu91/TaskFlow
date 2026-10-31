@@ -322,11 +322,12 @@ function completeTask(id) {
   showCompletionUndo(task);
 }
 
-// 自動で消さず、次の完了操作か「閉じる」まで最後の1件を取り消せる。
+// 次の完了操作か「閉じる」まで、直近の単体／一括完了を取り消せる。
 let lastCompletion = null;
-function showCompletionUndo(task) {
-  lastCompletion = { id: task.id, completedAt: task.completedAt };
-  document.getElementById("completionUndoMessage").textContent = `「${task.title}」を完了しました。`;
+function showCompletionUndo(value) {
+  const completed = Array.isArray(value) ? value : [value];
+  lastCompletion = { items: completed.map(task => ({ id: task.id, completedAt: task.completedAt })), bulk: Array.isArray(value) };
+  document.getElementById("completionUndoMessage").textContent = lastCompletion.bulk ? `${completed.length}件を完了しました。まとめて元に戻せます。` : `「${completed[0].title}」を完了しました。`;
   document.getElementById("completionUndo").hidden = false;
 }
 function hideCompletionUndo() {
@@ -334,19 +335,24 @@ function hideCompletionUndo() {
   document.getElementById("completionUndo").hidden = true;
 }
 document.getElementById("undoCompletionButton").addEventListener("click", () => {
-  const task = tasks.find(item => item.id === lastCompletion?.id);
-  if (!task?.completed || task.completedAt !== lastCompletion.completedAt) {
+  const targets = getCompletionUndoTargets();
+  if (!targets.length) {
     hideCompletionUndo();
     return;
   }
-  restoreIncompleteTask(task);
-  const parent = tasks.find(item => item.id === task.parentId);
-  if (parent?.completed) restoreIncompleteTask(parent);
+  for (const task of targets) {
+    restoreIncompleteTask(task);
+    const parent = tasks.find(item => item.id === task.parentId);
+    if (parent?.completed) restoreIncompleteTask(parent);
+  }
   if (!saveTasks()) return;
   hideCompletionUndo();
   displayTasks();
-  notifyStorage(`「${task.title}」の完了を取り消し、元の進捗に戻しました。`);
+  notifyStorage(`${targets.length}件の完了を取り消し、元の進捗に戻しました。`);
 });
+function getCompletionUndoTargets() {
+  return (lastCompletion?.items || []).map(record => tasks.find(task => task.id === record.id && task.completed && task.completedAt === record.completedAt)).filter(Boolean);
+}
 document.getElementById("dismissCompletionUndo").addEventListener("click", hideCompletionUndo);
 
 function deleteTask(id) {
@@ -1478,7 +1484,12 @@ function displayAllTasks() {
 
   const totalActive = tasks.filter(task => !task.completed).length;
   const scope = selectedCategory ? `分類「${selectedCategory === "__uncategorized" ? "未分類" : selectedCategory.slice(9)}」` : "全分類";
-  allTasksCount.textContent = `このページ${visibleRows.length}件（親カード内の子は別） / 表示対象${filteredTasks.length}タスク / ${scope}${activeTasks.length}件 / 全体${totalActive}件（未完了）`;
+  const grouped = rows.length !== filteredTasks.length;
+  const unit = grouped ? "組" : "件";
+  const prefix = selectedCategory || keyword || filterType !== "all" || selectedDeadlineBucket ? "対象" : "全";
+  allTasksCount.textContent = rows.length
+    ? `${prefix}${rows.length}${unit}中 ${listPage * LIST_PAGE_SIZE + 1}〜${listPage * LIST_PAGE_SIZE + visibleRows.length}${unit}` : `${prefix}0件`;
+  document.getElementById("allTasksCountDetails").textContent = `検索・絞り込み後${filteredTasks.length}タスク / ${scope}${activeTasks.length}件 / 全体${totalActive}件（未完了）。${grouped ? "親と子を同じカードにまとめているため、ページはまとまり（組）で数えます。" : "ページは表示するタスク数で数えます。"}親カード内の子は自動選択しません。`;
 
   visibleRows.forEach(function (task) {
     const card = createTaskCard(task, true);
@@ -1488,9 +1499,11 @@ function displayAllTasks() {
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
       checkbox.checked = selectedTaskIds.has(task.id);
+      card.classList.toggle("task-selected", checkbox.checked);
       checkbox.addEventListener("change", () => {
         if (checkbox.checked) selectedTaskIds.add(task.id);
         else selectedTaskIds.delete(task.id);
+        card.classList.toggle("task-selected", checkbox.checked);
         updateSelectionStatus();
       });
       label.appendChild(checkbox);
@@ -1499,10 +1512,15 @@ function displayAllTasks() {
     }
     allTasksList.appendChild(card);
   });
-  allTasksList.classList.toggle("compact-list", document.getElementById("compactListInput").checked);
+  allTasksList.classList.add("compact-list");
   document.getElementById("previousPage").disabled = listPage === 0;
   document.getElementById("nextPage").disabled = listPage >= totalPages - 1;
   document.getElementById("pageStatus").textContent = `${listPage + 1} / ${totalPages}ページ・1ページ最大20件`;
+  document.getElementById("previousPageTop").disabled = listPage === 0;
+  document.getElementById("nextPageTop").disabled = listPage >= totalPages - 1;
+  const pageText = `${listPage + 1} / ${totalPages}`;
+  document.getElementById("pageStatus").textContent = pageText;
+  document.getElementById("pageStatusTop").textContent = pageText;
   updateSelectionStatus();
 
   emptyTaskMessage.hidden = filteredTasks.length !== 0;
@@ -1516,8 +1534,10 @@ function displayAllTasks() {
 
 function displayTasks() {
   const savedScroll = currentScreen === "all" ? window.scrollY : null;
-  if (lastCompletion && !tasks.some(task => task.id === lastCompletion.id && task.completed && task.completedAt === lastCompletion.completedAt)) {
+  if (lastCompletion && !getCompletionUndoTargets().length) {
     hideCompletionUndo();
+  } else if (lastCompletion?.bulk) {
+    document.getElementById("completionUndoMessage").textContent = `${getCompletionUndoTargets().length}件の完了をまとめて元に戻せます。`;
   }
   refreshCategoryOptions();
   populateParentOptions(parentInput, null, parentInput.value);
@@ -1607,9 +1627,15 @@ function refreshCategoryOptions() {
   const categories = [...new Set(tasks.map(task => task.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ja"));
   selectedCategory = selected === "__uncategorized" || categories.some(name => `category:${name}` === selected) ? selected : "";
   const tabs = document.getElementById("categoryTabs");
+  const listCategory = document.getElementById("listCategorySelect");
+  listCategory.innerHTML = "";
   const hadFocus = tabs.contains(document.activeElement);
   tabs.innerHTML = "";
   for (const [value, label] of [["", "すべて"], ["__uncategorized", "未分類"], ...categories.map(name => [`category:${name}`, name])]) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    listCategory.appendChild(option);
     const button = document.createElement("button");
     button.type = "button";
     const name = document.createElement("span");
@@ -1630,6 +1656,7 @@ function refreshCategoryOptions() {
     tabs.appendChild(button);
     if (hadFocus && value === selectedCategory) button.focus();
   }
+  listCategory.value = selectedCategory;
   const options = document.getElementById("categoryOptions");
   options.innerHTML = "";
   for (const name of new Set(["大学", "仕事", "私生活", "生活", ...categories])) {
@@ -1953,6 +1980,9 @@ function updateSelectionStatus() {
   document.getElementById("toggleSelectionButton").setAttribute("aria-pressed", String(selectionMode));
   document.getElementById("toggleSelectionButton").textContent = selectionMode ? "選択モードを終了" : "選択モード";
   document.getElementById("selectionCount").textContent = `${selectedTaskIds.size}件選択`;
+  document.getElementById("selectionModeHint").textContent = selectionMode
+    ? `選択中：${selectedTaskIds.size}件。青い選択欄にチェックして、画面下から操作します。`
+    : "選択モードでまとめて操作できます";
   for (const id of ["bulkCompleteButton", "bulkMigrateButton", "bulkDeleteButton"]) {
     document.getElementById(id).disabled = selectedTaskIds.size === 0;
   }
@@ -1974,8 +2004,11 @@ document.getElementById("selectPageButton").addEventListener("click", () => {
 document.getElementById("clearSelectionButton").addEventListener("click", () => {
   selectedTaskIds.clear(); displayAllTasks();
 });
-document.getElementById("compactListInput").addEventListener("change", displayAllTasks);
-for (const [id, direction] of [["previousPage", -1], ["nextPage", 1]]) {
+document.getElementById("listCategorySelect").addEventListener("change", event => {
+  selectedCategory = event.target.value;
+  displayTasks();
+});
+for (const [id, direction] of [["previousPage", -1], ["nextPage", 1], ["previousPageTop", -1], ["nextPageTop", 1]]) {
   document.getElementById(id).addEventListener("click", () => {
     listPage = Math.max(0, listPage + direction);
     selectedTaskIds.clear();
@@ -2023,9 +2056,9 @@ function runBulkAction(action) {
     return;
   }
   selectedTaskIds.clear();
-  if (action === "complete") hideCompletionUndo();
   displayTasks();
-  document.getElementById("bulkResult").textContent = `${eligible.length}件を${names[action]}しました。${skipped}件は対象外です。${action === "complete" ? "取消は達成履歴から1件ずつ行えます。" : ""}`;
+  if (action === "complete") showCompletionUndo(eligible);
+  document.getElementById("bulkResult").textContent = `${eligible.length}件を${names[action]}しました。${skipped}件は対象外です。${action === "complete" ? "画面の「元に戻す」でまとめて取り消せます。" : ""}`;
 }
 for (const [id, action] of [["bulkCompleteButton", "complete"], ["bulkMigrateButton", "migrate"], ["bulkDeleteButton", "delete"]]) {
   document.getElementById(id).addEventListener("click", () => runBulkAction(action));

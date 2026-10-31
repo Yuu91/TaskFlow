@@ -169,7 +169,7 @@
           <button id="backButton" class="back-button">← ホームに戻る</button>
 
           <h2>すべてのタスク</h2>
-          <p id="allTasksCount"></p><p id="deadlineFilterStatus" role="status" hidden></p><button id="clearDeadlineFilter" type="button" hidden>締切の絞り込みを解除</button>
+          <p id="allTasksCount"></p><details class="count-explanation"><summary>件数の補足</summary><p id="allTasksCountDetails"></p></details><p id="deadlineFilterStatus" role="status" hidden></p><button id="clearDeadlineFilter" type="button" hidden>締切の絞り込みを解除</button>
         </div>
 
         <!-- 検索・並び替え・絞り込み -->
@@ -179,6 +179,7 @@
             <label for="taskSearch">タスクを検索</label>
             <input type="search" id="taskSearch" placeholder="タスク名を入力" />
           </div>
+          <div class="control-field"><label for="listCategorySelect">分類</label><select id="listCategorySelect"><option value="">すべて</option></select></div>
 
           <div class="control-field">
             <label for="taskSort">並び順</label>
@@ -201,7 +202,7 @@
         </div>
 
         <div class="list-toolbar">
-          <label><input id="compactListInput" type="checkbox" checked />コンパクト表示</label>
+          <span id="selectionModeHint" class="field-help">選択モードでまとめて操作できます</span>
           <button id="toggleSelectionButton" type="button" aria-pressed="false">選択モード</button>
         </div>
         <div id="bulkActions" class="bulk-actions" hidden>
@@ -219,6 +220,7 @@
           </div>
           <p id="bulkResult" role="status"></p>
         </div>
+        <nav class="list-pagination" aria-label="タスク一覧のページ（上部）"><button id="previousPageTop" type="button">前へ</button><span id="pageStatusTop"></span><button id="nextPageTop" type="button">次へ</button></nav>
         <ul id="allTasksList"></ul>
         <nav class="list-pagination" aria-label="タスク一覧のページ">
           <button id="previousPage" type="button">前へ</button><span id="pageStatus" role="status"></span><button id="nextPage" type="button">次へ</button>
