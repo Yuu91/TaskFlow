@@ -14,7 +14,7 @@
 
   <body>
     <header class="app-header">
-      <button id="menuButton" type="button" aria-label="タスクメニュー" aria-haspopup="dialog">☰</button><h1>TaskFlow</h1><button id="openAddButton" type="button">＋ タスク追加</button>
+      <button id="menuButton" type="button" aria-label="分類と案内のメニュー" aria-haspopup="dialog" aria-controls="taskMenu">☰</button><h1>TaskFlow</h1><button id="openAddButton" type="button">＋ 追加</button>
 
     </header>
     <div class="pwa-status" role="status">
@@ -30,6 +30,7 @@
       <!-- ===== ホーム画面 ===== -->
 
       <div id="homeScreen">
+        <div id="homeCategoryNotice" class="filter-notice" hidden><span id="homeCategoryLabel" role="status"></span><button id="clearHomeCategory" type="button">すべてに戻す</button></div>
         <div class="taskflow-layout">
           <!-- 左側：タスク追加エリア -->
           <aside class="taskflow-sidebar">
@@ -141,17 +142,11 @@
 
             <!-- ===== 進行中のタスク ===== -->
             <details class="home-accordion"><summary>達成履歴</summary><div id="mobileCompletedSlot"></div></details>
-            <details class="task-list-panel home-accordion"><summary>進行中のタスク・分類</summary>
+            <details class="task-list-panel home-accordion"><summary>進行中のタスク</summary>
               <h2>
                 進行中のタスク
                 <span id="taskCount"></span>
               </h2>
-              <div id="homeCategorySlot">
-                <div class="category-controls">
-                  <div id="categoryTabs" class="category-tabs" role="group" aria-label="表示するタスクの分類"></div>
-                  <span id="categoryStatus" role="status"></span>
-                </div>
-              </div>
 
               <ul id="taskList"></ul>
 
@@ -178,7 +173,7 @@
         </div>
 
         <!-- 検索・並び替え・絞り込み -->
-        <div id="allCategorySlot"></div>
+        <div id="allCategoryNotice" class="filter-notice" hidden><span id="allCategoryLabel" role="status"></span><button id="clearAllCategory" type="button">解除</button></div>
         <div class="task-controls">
           <div class="control-field">
             <label for="taskSearch">タスクを検索</label>
@@ -205,7 +200,29 @@
           </div>
         </div>
 
+        <div class="list-toolbar">
+          <label><input id="compactListInput" type="checkbox" checked />コンパクト表示</label>
+          <button id="toggleSelectionButton" type="button" aria-pressed="false">選択モード</button>
+        </div>
+        <div id="bulkActions" class="bulk-actions" hidden>
+          <p>検索・分類・締切・並び順・ページを変更すると選択を解除します。</p>
+          <div class="bulk-selection-controls">
+          <button id="selectPageButton" type="button">このページを全選択</button>
+          <button id="clearSelectionButton" type="button">選択解除</button>
+          <span id="selectionCount" role="status">0件選択</span>
+          <button id="exitSelectionButton" type="button">選択を終了</button>
+          </div>
+          <div class="bulk-task-buttons" role="group" aria-label="選択したタスクの操作">
+          <button id="bulkCompleteButton" type="button">選択分を完了</button>
+          <button id="bulkMigrateButton" type="button">選択分を明日へ移行</button>
+          <button id="bulkDeleteButton" type="button">選択分を削除</button>
+          </div>
+          <p id="bulkResult" role="status"></p>
+        </div>
         <ul id="allTasksList"></ul>
+        <nav class="list-pagination" aria-label="タスク一覧のページ">
+          <button id="previousPage" type="button">前へ</button><span id="pageStatus" role="status"></span><button id="nextPage" type="button">次へ</button>
+        </nav>
 
         <p id="emptyTaskMessage" hidden>条件に一致するタスクはありません。</p>
       </section>
@@ -250,11 +267,11 @@
         <p id="backupSaveStatus" role="status"></p>
       </div>
     </section>    <section class="app-guides" aria-label="使い方とデータについて">
-      <details>
+      <details id="usageGuide">
         <summary>使い方</summary>
         <ol>
-          <li>上部の「＋タスク追加」で入力画面を開き、タスク名を入力します。締切は終える期限、予定日は取り組む日です。どちらも任意です。</li>
-          <li>分類は「大学」「仕事」「私生活」などを選ぶか、自分で入力できます。ホームの進行中タスクやタスク一覧の分類タブで表示を切り替えます。</li>
+          <li>上部の「＋追加」で入力画面を開き、タスク名を入力します。締切は終える期限、予定日は取り組む日です。どちらも任意です。</li>
+          <li>分類は「大学」「仕事」「私生活」などを選ぶか、自分で入力できます。左上の☰メニューで表示する分類を切り替えます。</li>
           <li>重要度と作業規模を選び、「タスクを追加」を押します。作業規模の目安は短い1日・普通2日・長い4日・かなり長い7日です。</li>
           <li>予定日があればその日を優先し、なければ締切と残り作業量から着手日を提案します。締切を過ぎたものは今日に表示します。</li>
           <li>締切・予定日がないタスクは、今日のタスクが少ないときだけ「余裕があれば」と表示します。それ以外も全タスク一覧で確認できます。</li>
@@ -263,7 +280,7 @@
           <li>タスクの変更は自動保存、振り返りメモは「振り返りを保存」で保存します。予定日に自動通知する機能はまだありません。</li>
         </ol>
       </details>
-      <details>
+      <details id="privacyGuide">
         <summary>データの保存先・安全性・バックアップ</summary>
         <p>入力したタスクとメモは、この端末のブラウザー・ホーム画面アプリ内に保存します。現在、タスクやメモをサーバーへ送る処理や、他の利用者との自動共有・端末間同期はありません。画面ファイルの取得や更新には通信します。</p>
         <p>端末内保存は暗号化された保管庫として設計していません。共用端末や機密情報の登録には注意してください。端末の故障、サイトデータの削除、保存領域の整理などで失われる可能性があります。</p>
@@ -282,6 +299,7 @@
         <input type="text" id="editTaskInput" />
         <p id="editTaskMessage" role="status" hidden></p>
         <label for="editParentInput">大きなタスク（任意）</label>
+        <input id="editParentSearch" type="search" placeholder="親タスク名を検索" aria-label="編集する親タスクの候補を検索" />
         <select id="editParentInput"><option value="">独立したタスク</option></select>
 
         <label for="editDeadlineInput">締切</label>
@@ -335,6 +353,7 @@
                 <p class="field-help">必須はタスク名だけです。日付を空にするか「締切を決めない」で締切なしにできます。初期値は重要度「中」、作業規模「普通」です。</p>
                 <details id="addTaskAdvanced"><summary>詳しく設定（任意）</summary><div class="task-form">
                 <label for="parentInput">大きなタスク（任意）</label>
+                <input id="parentSearch" type="search" placeholder="親タスク名を検索" aria-label="親タスクの候補を検索" />
                 <select id="parentInput"><option value="">独立したタスク</option></select>
                 <label for="plannedDateInput">取り組む予定日（任意）</label>
                 <input type="date" id="plannedDateInput" />
@@ -362,10 +381,14 @@
               </div>
             </section><button id="cancelAddButton" type="button">閉じる</button></dialog>
     <dialog id="taskMenu" class="task-dialog task-menu" aria-labelledby="taskMenuTitle">
-      <h2 id="taskMenuTitle">タスクのまとまり</h2>
-      <p>大きなタスクを開くと、中の小さなタスクを確認できます。</p>
-      <div id="taskTree"></div>
-      <button id="closeMenuButton" type="button">閉じる</button>
+      <div class="drawer-heading"><h2 id="taskMenuTitle">表示する分類</h2><button id="closeMenuButton" type="button" aria-label="分類メニューを閉じる">×</button></div>
+      <p class="field-help">未完了のタスク</p>
+      <div class="category-controls">
+        <div id="categoryTabs" class="category-tabs" role="group" aria-label="表示するタスクの分類"></div>
+        <p id="categoryStatus" role="status"></p>
+      </div>
+      <div class="drawer-guides"><button id="menuHelpButton" type="button">？　使い方　›</button><button id="menuPrivacyButton" type="button">ⓘ　データの保存について　›</button></div>
+      <p class="drawer-note">分類はホームと一覧に反映されます。親子タスクはタスクカードの中で確認できます。</p>
     </dialog>
     <div id="completionUndo" class="completion-undo" hidden>
       <span id="completionUndoMessage" role="status"></span>

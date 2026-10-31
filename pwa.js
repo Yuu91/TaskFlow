@@ -11,12 +11,14 @@
   let controllerChanged = false;
   let hadController = Boolean(navigator.serviceWorker.controller);
   function showStatus() {
+    document.querySelector(".pwa-status").setAttribute("data-state",
+      updateAvailable || controllerChanged ? "update" : registration?.active ? "ready" : "preparing");
     button.hidden = !updateAvailable && !controllerChanged;
     button.textContent = controllerChanged ? "新しい版を開く" : "更新する";
     status.textContent = updateAvailable || controllerChanged
       ? "新しいバージョンがあります。入力内容を保存してから更新してください。"
       : registration?.active
-        ? (navigator.onLine ? "オフライン起動の準備ができました。" : "オフラインで利用中です。変更は端末内に保存されます。")
+        ? (navigator.onLine ? "オフライン利用可能" : "オフラインで利用中・端末内に保存")
         : "オフライン起動の準備中です。通信を切らずにお待ちください。";
   }
   // 他のタブで更新されても、この画面を勝手に再読み込みしない。
@@ -53,7 +55,10 @@
           if (installing.state === "activated") {
             checkWaiting();
           }
-          if (installing.state === "redundant") status.textContent = "オフライン用ファイルの取得に失敗しました。通信を確認して再読み込みしてください。";
+          if (installing.state === "redundant") {
+            document.querySelector(".pwa-status").setAttribute("data-state", "error");
+            status.textContent = "オフライン用ファイルの取得に失敗しました。通信を確認して再読み込みしてください。";
+          }
         });
       });
       await navigator.serviceWorker.ready;
@@ -62,6 +67,7 @@
         if (!document.hidden && navigator.onLine) registration.update().catch(() => {});
       });
     } catch (error) {
+      document.querySelector(".pwa-status").setAttribute("data-state", "error");
       status.textContent = "オフライン利用の準備ができませんでした。通信とHTTPSの公開設定を確認して再読み込みしてください。";
     }
   });

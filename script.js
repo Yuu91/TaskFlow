@@ -37,6 +37,7 @@ const parentInput = document.getElementById("parentInput");
 const editParentInput = document.getElementById("editParentInput");
 // 折りたたみの開閉は画面内の状態として保持する。
 const expandedTaskIds = new Set();
+const subtaskGroupStates = new Map();
 const backButton = document.getElementById("backButton");
 
 const allTasksList = document.getElementById("allTasksList");
@@ -61,6 +62,13 @@ const categoryInput = document.getElementById("categoryInput");
 const editPlannedDateInput = document.getElementById("editPlannedDateInput");
 const editCategoryInput = document.getElementById("editCategoryInput");
 let selectedCategory = "";
+const LIST_PAGE_SIZE = 20;
+let listPage = 0;
+let listSignature = "";
+let selectionMode = false;
+const selectedTaskIds = new Set();
+let pageTaskIds = [];
+let pendingJumpId = null;
 
 /* ===== 編集フォーム用 ===== */
 
@@ -366,6 +374,7 @@ function editTask(id) {
   }
 
   editingTaskId = id;
+  document.getElementById("editParentSearch").value = "";
   document.getElementById("editTaskMessage").hidden = true;
 
   // 現在の設定をフォームに反映
@@ -624,7 +633,7 @@ function sortByRecommendation(taskArray) {
 
 /* ===== タスクカード作成 ===== */
 
-function createTaskCard(task) {
+function createTaskCard(task, listContext = false) {
   const li = document.createElement("li");
 
   li.dataset.taskId = task.id;
@@ -689,19 +698,20 @@ function createTaskCard(task) {
   scoreBadge.className = "priority-score";
 
   if (priorityScore >= 75) {
-    scoreBadge.textContent = `最優先・優先度スコア${priorityScore}`;
+    scoreBadge.textContent = "最優先";
     scoreBadge.classList.add("priority-urgent");
   } else if (priorityScore >= 50) {
-    scoreBadge.textContent = `優先・優先度スコア${priorityScore}`;
+    scoreBadge.textContent = "優先";
     scoreBadge.classList.add("priority-high");
   } else {
-    scoreBadge.textContent = `通常・優先度スコア${priorityScore}`;
+    scoreBadge.textContent = "通常";
     scoreBadge.classList.add("priority-normal");
   }
 
   taskInfo.appendChild(scoreBadge);
+  scoreBadge.setAttribute("aria-label", `優先度スコア${priorityScore}`);
   const scoreExplanation = document.createElement("small");
-  scoreExplanation.textContent = "優先度スコアは高いほど着手をおすすめします。締切・重要度・残り作業量・進捗から計算する目安で、達成度や本人の評価ではありません。";
+  scoreExplanation.textContent = `優先度スコア${priorityScore}。高いほど着手をおすすめします。締切・重要度・残り作業量・進捗から計算する目安で、達成度や本人の評価ではありません。`;
   foldedInfo.appendChild(scoreExplanation);
   if (task.parentId) {
     li.classList.add("subtask-card");
@@ -822,6 +832,10 @@ function createTaskCard(task) {
   if (canUndoMigration(task)) buttonGroup.appendChild(createUndoMigrationButton(task));
 
   li.appendChild(taskInfo);
+  const metadata = document.createElement("small");
+  metadata.className = "card-metadata";
+  metadata.textContent = `締切 ${task.deadline || "なし"} ・進捗 ${task.progress ?? 0}%${task.plannedDate ? ` ・予定 ${task.plannedDate}` : ""}`;
+  li.appendChild(metadata);
   const controls = document.createElement("details");
   controls.className = "task-accordion";
   controls.open = expandedTaskIds.has(task.id);
@@ -852,13 +866,14 @@ function createTaskCard(task) {
     if (children.length) {
       const group = document.createElement("details");
       group.className = "subtask-group";
-      group.open = true;
+      group.open = subtaskGroupStates.has(task.id) ? subtaskGroupStates.get(task.id) : !listContext;
       const heading = document.createElement("summary");
       heading.textContent = `小さなタスク ${children.filter(item => item.completed).length}/${children.length}件完了`;
+      heading.addEventListener("click", () => subtaskGroupStates.set(task.id, !group.open));
       group.appendChild(heading);
       const list = document.createElement("ul");
       for (const child of children) {
-        if (!child.completed) list.appendChild(createTaskCard(child));
+        if (!child.completed) list.appendChild(createTaskCard(child, listContext));
         else {
           const done = document.createElement("li");
           done.textContent = `✓ ${child.title}`;
@@ -1226,9 +1241,12 @@ function displayDailyPlan() {
 /* ===== 指定したタスクカードへ移動 ===== */
 
 function jumpToTaskCard(id) {
+  pendingJumpId = id;
   const changedConditions = Boolean(taskSearch.value || taskFilter.value !== "all" || selectedDeadlineBucket);
   expandedTaskIds.add(id);
   const requestedTask = tasks.find(task => task.id === id);
+  if (requestedTask?.parentId) subtaskGroupStates.set(requestedTask.parentId, true);
+  else if (tasks.some(task => task.parentId === id)) subtaskGroupStates.set(id, true);
   if (requestedTask && !getVisibleTasks().some(task => task.id === id)) {
     selectedCategory = "";
     refreshCategoryOptions();
@@ -1437,13 +1455,55 @@ function displayAllTasks() {
 
   filteredTasks = sortTasks(filteredTasks, sortType);
 
+  const signature = JSON.stringify([selectedCategory, keyword, filterType, sortType, selectedDeadlineBucket]);
+  if (signature !== listSignature) {
+    listPage = 0;
+    selectedTaskIds.clear();
+    listSignature = signature;
+  }
+  const rows = filteredTasks.filter(task => !task.parentId || !filteredTasks.some(parent => parent.id === task.parentId));
+  if (pendingJumpId) {
+    const requested = tasks.find(task => task.id === pendingJumpId);
+    const index = rows.findIndex(task => task.id === pendingJumpId || task.id === requested?.parentId);
+    if (index >= 0) listPage = Math.floor(index / LIST_PAGE_SIZE);
+    pendingJumpId = null;
+  }
+  const totalPages = Math.max(1, Math.ceil(rows.length / LIST_PAGE_SIZE));
+  listPage = Math.min(listPage, totalPages - 1);
+  const visibleRows = rows.slice(listPage * LIST_PAGE_SIZE, (listPage + 1) * LIST_PAGE_SIZE);
+  pageTaskIds = visibleRows.map(task => task.id);
+  for (const id of selectedTaskIds) {
+    if (!pageTaskIds.includes(id)) selectedTaskIds.delete(id);
+  }
+
   const totalActive = tasks.filter(task => !task.completed).length;
   const scope = selectedCategory ? `分類「${selectedCategory === "__uncategorized" ? "未分類" : selectedCategory.slice(9)}」` : "全分類";
-  allTasksCount.textContent = `表示対象${filteredTasks.length}件 / ${scope}${activeTasks.length}件 / 全体${totalActive}件（未完了）`;
+  allTasksCount.textContent = `このページ${visibleRows.length}件（親カード内の子は別） / 表示対象${filteredTasks.length}タスク / ${scope}${activeTasks.length}件 / 全体${totalActive}件（未完了）`;
 
-  filteredTasks.filter(task => !task.parentId || !filteredTasks.some(parent => parent.id === task.parentId)).forEach(function (task) {
-    allTasksList.appendChild(createTaskCard(task));
+  visibleRows.forEach(function (task) {
+    const card = createTaskCard(task, true);
+    if (selectionMode) {
+      const label = document.createElement("label");
+      label.className = "task-selection";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = selectedTaskIds.has(task.id);
+      checkbox.addEventListener("change", () => {
+        if (checkbox.checked) selectedTaskIds.add(task.id);
+        else selectedTaskIds.delete(task.id);
+        updateSelectionStatus();
+      });
+      label.appendChild(checkbox);
+      label.appendChild(document.createTextNode(`「${task.title}」を選択（子は自動選択しません）`));
+      card.prepend(label);
+    }
+    allTasksList.appendChild(card);
   });
+  allTasksList.classList.toggle("compact-list", document.getElementById("compactListInput").checked);
+  document.getElementById("previousPage").disabled = listPage === 0;
+  document.getElementById("nextPage").disabled = listPage >= totalPages - 1;
+  document.getElementById("pageStatus").textContent = `${listPage + 1} / ${totalPages}ページ・1ページ最大20件`;
+  updateSelectionStatus();
 
   emptyTaskMessage.hidden = filteredTasks.length !== 0;
   document.getElementById("clearDeadlineFilter").hidden = !selectedDeadlineBucket;
@@ -1455,18 +1515,19 @@ function displayAllTasks() {
 /* ===== 全体の表示更新 ===== */
 
 function displayTasks() {
+  const savedScroll = currentScreen === "all" ? window.scrollY : null;
   if (lastCompletion && !tasks.some(task => task.id === lastCompletion.id && task.completed && task.completedAt === lastCompletion.completedAt)) {
     hideCompletionUndo();
   }
   refreshCategoryOptions();
   populateParentOptions(parentInput, null, parentInput.value);
-  renderTaskTree();
   displayHomeTasks();
   displayAllTasks();
   displayCompletedTasks();
   displayDailyPlan();
   displayDailyReview();
   displayDeadlineChart();
+  if (savedScroll != null) window.scrollTo(0, savedScroll);
 }
 
 const deadlineBucketLabels = {
@@ -1551,12 +1612,20 @@ function refreshCategoryOptions() {
   for (const [value, label] of [["", "すべて"], ["__uncategorized", "未分類"], ...categories.map(name => [`category:${name}`, name])]) {
     const button = document.createElement("button");
     button.type = "button";
-    button.textContent = label;
+    const name = document.createElement("span");
+    name.textContent = label;
+    const count = document.createElement("span");
+    count.className = "menu-category-count";
+    count.textContent = `${tasks.filter(task => !task.completed && (!value || (value === "__uncategorized" ? !task.category : `category:${task.category}` === value))).length}件`;
+    button.appendChild(name);
+    button.appendChild(count);
+    button.setAttribute("aria-label", `${label}、未完了${count.textContent}`);
     button.className = "category-tab";
     button.setAttribute("aria-pressed", String(value === selectedCategory));
     button.addEventListener("click", () => {
       selectedCategory = value;
       displayTasks();
+      taskMenu.close();
     });
     tabs.appendChild(button);
     if (hadFocus && value === selectedCategory) button.focus();
@@ -1586,6 +1655,11 @@ function refreshCategoryOptions() {
   document.getElementById("categoryStatus").textContent = selectedCategory
     ? `「${selectedCategory === "__uncategorized" ? "未分類" : selectedCategory.slice(9)}」のタスクを表示中。振り返りメモとバックアップは全分類共通です。`
     : "すべての分類を表示中";
+  document.getElementById("homeCategoryNotice").hidden = !selectedCategory;
+  document.getElementById("homeCategoryLabel").textContent = selectedCategory
+    ? `「${selectedCategory === "__uncategorized" ? "未分類" : selectedCategory.slice(9)}」のみ表示中` : "";
+  document.getElementById("allCategoryNotice").hidden = !selectedCategory;
+  document.getElementById("allCategoryLabel").textContent = document.getElementById("homeCategoryLabel").textContent;
 }
 
 /* ===== 画面切り替え ===== */
@@ -1601,8 +1675,6 @@ function showScreen(screen) {
     if (button.dataset.screen === screen) button.setAttribute("aria-current", "page");
     else button.removeAttribute("aria-current");
   }
-  document.getElementById(screen === "all" ? "allCategorySlot" : "homeCategorySlot")
-    .appendChild(document.querySelector(".category-controls"));
 
   window.scrollTo(0, 0);
 }
@@ -1825,6 +1897,7 @@ function setEditBackgroundInert(value) {
   }
 }
 function populateParentOptions(select, editingId, selected = "") {
+  const query = document.getElementById(select === parentInput ? "parentSearch" : "editParentSearch").value.trim().toLowerCase();
   const editingTask = tasks.find(task => task.id === editingId);
   const hasChildren = editingId != null && tasks.some(task => task.parentId === editingId);
   select.innerHTML = "";
@@ -1833,7 +1906,8 @@ function populateParentOptions(select, editingId, selected = "") {
   independent.textContent = "独立したタスク";
   select.appendChild(independent);
   if (!hasChildren) {
-    for (const task of tasks.filter(task => !task.parentId && !task.completed && task.id !== editingId)) {
+    for (const task of tasks.filter(task => !task.parentId && !task.completed && task.id !== editingId &&
+      (task.id === selected || task.title.toLowerCase().includes(query)))) {
       const option = document.createElement("option");
       option.value = task.id;
       option.textContent = task.title;
@@ -1852,6 +1926,7 @@ function populateParentOptions(select, editingId, selected = "") {
   if (select.selectedIndex === -1) select.value = "";
 }
 function openAddTaskModal(parentId = null) {
+  document.getElementById("parentSearch").value = "";
   document.getElementById("addTaskMessage").hidden = true;
   const parent = tasks.find(task => task.id === parentId && !task.completed && !task.parentId);
   populateParentOptions(parentInput, null, parent?.id || "");
@@ -1861,45 +1936,118 @@ function openAddTaskModal(parentId = null) {
   addTaskModal.showModal();
   taskInput.focus();
 }
+
+document.getElementById("clearHomeCategory").addEventListener("click", () => {
+  selectedCategory = "";
+  displayTasks();
+});
+document.getElementById("clearAllCategory").addEventListener("click", () => {
+  selectedCategory = "";
+  displayTasks();
+});
+for (const [id, select, getEditingId] of [["parentSearch", parentInput, () => null], ["editParentSearch", editParentInput, () => editingTaskId]]) {
+  document.getElementById(id).addEventListener("input", () => populateParentOptions(select, getEditingId(), select.value));
+}
+function updateSelectionStatus() {
+  document.getElementById("bulkActions").hidden = !selectionMode;
+  document.getElementById("toggleSelectionButton").setAttribute("aria-pressed", String(selectionMode));
+  document.getElementById("toggleSelectionButton").textContent = selectionMode ? "選択モードを終了" : "選択モード";
+  document.getElementById("selectionCount").textContent = `${selectedTaskIds.size}件選択`;
+  for (const id of ["bulkCompleteButton", "bulkMigrateButton", "bulkDeleteButton"]) {
+    document.getElementById(id).disabled = selectedTaskIds.size === 0;
+  }
+}
+document.getElementById("toggleSelectionButton").addEventListener("click", () => {
+  selectionMode = !selectionMode;
+  selectedTaskIds.clear();
+  displayAllTasks();
+});
+document.getElementById("exitSelectionButton").addEventListener("click", () => {
+  selectionMode = false;
+  selectedTaskIds.clear();
+  displayAllTasks();
+});
+document.getElementById("selectPageButton").addEventListener("click", () => {
+  pageTaskIds.forEach(id => selectedTaskIds.add(id));
+  displayAllTasks();
+});
+document.getElementById("clearSelectionButton").addEventListener("click", () => {
+  selectedTaskIds.clear(); displayAllTasks();
+});
+document.getElementById("compactListInput").addEventListener("change", displayAllTasks);
+for (const [id, direction] of [["previousPage", -1], ["nextPage", 1]]) {
+  document.getElementById(id).addEventListener("click", () => {
+    listPage = Math.max(0, listPage + direction);
+    selectedTaskIds.clear();
+    displayAllTasks();
+    allTasksCount.scrollIntoView({ block: "start" });
+  });
+}
+function runBulkAction(action) {
+  const chosen = tasks.filter(task => selectedTaskIds.has(task.id) && pageTaskIds.includes(task.id) && !task.completed);
+  if (!chosen.length) return;
+  const today = formatDate(new Date());
+  const tomorrow = formatDate(addDays(new Date(), 1));
+  const chosenIds = new Set(chosen.map(task => task.id));
+  const eligible = chosen.filter(task => {
+    if (action === "complete") return !tasks.some(child => child.parentId === task.id && !child.completed && !chosenIds.has(child.id));
+    if (action === "migrate") return (!task.deadline || task.deadline > today) && task.plannedDate !== tomorrow;
+    return true;
+  });
+  const skipped = chosen.length - eligible.length;
+  const names = { complete: "完了", migrate: "明日へ移行", delete: "削除" };
+  if (!names[action]) return;
+  if (!eligible.length) {
+    document.getElementById("bulkResult").textContent = "処理できるタスクがありません。未完了の子がある親、今日以前が締切の移行、既に明日へ移行済みのものは対象外です。";
+    return;
+  }
+  if (!confirm(`選択した${chosen.length}件のうち${eligible.length}件を${names[action]}します。${skipped}件は条件により処理しません。${action === "delete" ? "親を削除しても未選択の子は独立したタスクとして残します。削除は取り消せません。" : "子タスクは自動で対象に含めません。"}\n対象：${eligible.slice(0, 5).map(task => task.title).join("、")}${eligible.length > 5 ? " ほか" : ""}`)) return;
+  const changedIds = new Set(eligible.map(task => task.id));
+  if (action === "delete") {
+    tasks = tasks.filter(task => !changedIds.has(task.id));
+    tasks.forEach(task => { if (changedIds.has(task.parentId)) task.parentId = null; });
+  } else for (const task of eligible) {
+    if (action === "complete") {
+      task.progressBeforeCompletion = task.progress ?? 0;
+      task.completed = true;
+      task.progress = 100;
+      task.completedAt = new Date().toISOString();
+    } else {
+      task.migrationUndo = { plannedDate: task.plannedDate ?? null, migrationCount: task.migrationCount ?? 0, targetDate: tomorrow };
+      task.plannedDate = tomorrow;
+      task.migrationCount = (task.migrationCount ?? 0) + 1;
+    }
+  }
+  if (!saveTasks()) {
+    document.getElementById("bulkResult").textContent = "保存できなかったため変更は反映していません。";
+    return;
+  }
+  selectedTaskIds.clear();
+  if (action === "complete") hideCompletionUndo();
+  displayTasks();
+  document.getElementById("bulkResult").textContent = `${eligible.length}件を${names[action]}しました。${skipped}件は対象外です。${action === "complete" ? "取消は達成履歴から1件ずつ行えます。" : ""}`;
+}
+for (const [id, action] of [["bulkCompleteButton", "complete"], ["bulkMigrateButton", "migrate"], ["bulkDeleteButton", "delete"]]) {
+  document.getElementById(id).addEventListener("click", () => runBulkAction(action));
+}
 document.getElementById("openAddButton").addEventListener("click", () => openAddTaskModal());
 document.getElementById("cancelAddButton").addEventListener("click", () => addTaskModal.close());
 document.getElementById("menuButton").addEventListener("click", () => {
-  renderTaskTree();
   taskMenu.showModal();
 });
 document.getElementById("closeMenuButton").addEventListener("click", () => taskMenu.close());
+for (const [buttonId, guideId] of [["menuHelpButton", "usageGuide"], ["menuPrivacyButton", "privacyGuide"]]) {
+  document.getElementById(buttonId).addEventListener("click", () => {
+    taskMenu.close();
+    showScreen("backup");
+    const guide = document.getElementById(guideId);
+    guide.open = true;
+    guide.querySelector("summary").focus();
+    guide.scrollIntoView({ block: "start" });
+  });
+}
 for (const button of document.querySelectorAll(".bottom-nav [data-screen]")) {
   button.addEventListener("click", () => showScreen(button.dataset.screen));
-}
-function renderTaskTree() {
-  const tree = document.getElementById("taskTree");
-  tree.innerHTML = "";
-  const roots = tasks.filter(task => !task.parentId && !task.completed);
-  if (!roots.length) tree.textContent = "未完了のタスクはありません。＋タスク追加から登録できます。";
-  for (const root of roots) {
-    const branch = document.createElement("details");
-    const summary = document.createElement("summary");
-    summary.textContent = root.title;
-    branch.appendChild(summary);
-    for (const task of [root, ...tasks.filter(task => task.parentId === root.id && !task.completed)]) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = task === root ? "このタスクを開く" : `↳ ${task.title}`;
-      button.addEventListener("click", () => {
-        taskMenu.close();
-        selectedCategory = "";
-        displayTasks();
-        jumpToTaskCard(task.id);
-      });
-      branch.appendChild(button);
-    }
-    const add = document.createElement("button");
-    add.type = "button";
-    add.textContent = "＋ 小さなタスクを追加";
-    add.addEventListener("click", () => openAddTaskModal(root.id));
-    branch.appendChild(add);
-    tree.appendChild(branch);
-  }
 }
 
 showScreen("home");
