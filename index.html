@@ -14,77 +14,16 @@
 
   <body>
     <header class="app-header">
-      <h1>TaskFlow</h1>
-      <p>あなたのタスクを賢く管理するアプリ</p>
+      <button id="menuButton" type="button" aria-label="タスクメニュー" aria-haspopup="dialog">☰</button><h1>TaskFlow</h1><button id="openAddButton" type="button">＋ タスク追加</button>
+
     </header>
     <div class="pwa-status" role="status">
       <span id="pwaStatus">オフライン利用の準備状況を確認しています。</span>
       <button id="pwaUpdate" type="button" hidden>更新する</button>
     </div>
     <p id="storageMessage" role="status" hidden></p>
-    <section class="backup-controls" aria-label="データ管理">
-      <button id="exportButton" type="button" aria-controls="backupPreview" aria-expanded="false">バックアップを作成・保存</button>
-      <button id="importButton" type="button">バックアップから復元</button>
-      <input id="importFile" type="file" accept=".json,application/json" hidden />
-      <p>復元すると現在の全データを置き換えます。先にバックアップを保存してください。</p>
-      <details class="info-panel">
-        <summary>コピーした文章から復元する</summary>
-        <p>別のブラウザーから持ち出したバックアップ全文を貼り付けてください。現在の全データを置き換える前に確認します。</p>
-        <label for="importBackupText">バックアップ全文（JSON）</label>
-        <textarea id="importBackupText" rows="5" spellcheck="false" autocapitalize="off"></textarea>
-        <button id="importTextButton" type="button">この文章から復元する</button>
-      </details>
-      <div id="backupPreview" class="info-panel" hidden>
-        <h2>データの控えを保存する</h2>
-        <button id="closeBackupButton" type="button">閉じる</button>
-        <p id="backupSummary"></p>
-        <ul id="backupTaskPreview"></ul>
-        <button id="shareBackupButton" type="button" hidden>共有メニューから保存</button>
-        <button id="downloadBackupButton" type="button">ファイルをダウンロード</button>
-        <div id="lineBackupNotice" hidden>
-          <p>LINE内ブラウザーではファイル保存が動かない場合があります。この画面では文章のコピーでデータを持ち出してください。</p>
-          <ol>
-            <li>下の「バックアップ全文をコピー」を押します。失敗したら文章欄を長押しして全選択・コピーします。</li>
-            <li>LINEのメニューから外部ブラウザー（iPhoneはSafariなど）で同じURLを開きます。</li>
-            <li>「コピーした文章から復元する」に全文を貼り付け、確認して復元します。その後、ファイルとして保存できます。</li>
-          </ol>
-          <p>LINE内とSafari・ホーム画面アプリでは保存場所が異なる場合があります。新しい画面でタスクを確認するまで、元のデータを削除しないでください。復元先に既存タスクがある場合は先にそちらもバックアップしてください。</p>
-        </div>
-        <details id="backupTextDetails">
-          <summary>保存できない場合：バックアップを文章でコピー</summary>
-          <p>全文をコピーしてメモアプリなどに保管できます。共有相手に内容を読まれるため、グループトークなどには送らないでください。</p>
-          <label for="backupText">バックアップ全文（変更せずにコピー）</label>
-          <textarea id="backupText" rows="5" readonly spellcheck="false"></textarea>
-          <button id="copyBackupButton" type="button">バックアップ全文をコピー</button>
-        </details>
-        <p>iPhoneでは「共有メニューから保存」→「ファイルに保存」を選びます。最後に「ファイル」アプリで、TaskFlowで始まるJSONファイルがあるか確認してください。</p>
-        <p>外部アプリを開く確認だけで終わる場合は、Safariまたはホーム画面のTaskFlowで開き直して試してください。ダウンロード後は「ファイル」アプリのダウンロード先を確認します。</p>
-        <p>このファイルは暗号化されていません。タスクやメモを含むため、保存先や共有相手に注意してください。</p>
-        <p id="backupSaveStatus" role="status"></p>
-      </div>
-    </section>
-    <section class="app-guides" aria-label="使い方とデータについて">
-      <details>
-        <summary>使い方</summary>
-        <ol>
-          <li>タスク名を入力します。締切は終える期限、予定日は取り組む日です。どちらも任意です。</li>
-          <li>分類は「大学」「仕事」「私生活」などを選ぶか、自分で入力できます。上の分類欄で表示を切り替えます。</li>
-          <li>重要度と作業規模を選び、「タスクを追加」を押します。作業規模の目安は短い1日・普通2日・長い4日・かなり長い7日です。</li>
-          <li>予定日があればその日を優先し、なければ締切と残り作業量から着手日を提案します。締切を過ぎたものは今日に表示します。</li>
-          <li>締切・予定日がないタスクは、今日のタスクが少ないときだけ「余裕があれば」と表示します。それ以外も全タスク一覧で確認できます。</li>
-          <li>優先スコアは締切・重要度・残り作業量・進捗による目安です。進捗100％になっても、最後に「完了」を押します。</li>
-          <li>「明日へ移行」で予定を明日に変更できます。間違えたら「移行を取り消す」で戻せます。</li>
-          <li>タスクの変更は自動保存、振り返りメモは「振り返りを保存」で保存します。予定日に自動通知する機能はまだありません。</li>
-        </ol>
-      </details>
-      <details>
-        <summary>データの保存先・安全性・バックアップ</summary>
-        <p>入力したタスクとメモは、この端末のブラウザー・ホーム画面アプリ内に保存します。現在、タスクやメモをサーバーへ送る処理や、他の利用者との自動共有・端末間同期はありません。画面ファイルの取得や更新には通信します。</p>
-        <p>端末内保存は暗号化された保管庫として設計していません。共用端末や機密情報の登録には注意してください。端末の故障、サイトデータの削除、保存領域の整理などで失われる可能性があります。</p>
-        <p>バックアップは、タスクと振り返りメモの「控え」を端末の外にも残せるJSONファイルです。分類で絞っていても全データを含みます。定期的に保存し、公開リポジトリにはアップロードしないでください。</p>
-        <p>復元は、控えの内容で現在の全データを置き換える操作です。読み込む前に確認画面が出ます。URL・端末・起動方法によって保存先が異なる場合は、バックアップで移せます。</p>
-      </details>
-    </section>
+
+
     <datalist id="categoryOptions"><option value="大学"></option><option value="仕事"></option><option value="私生活"></option><option value="生活"></option></datalist>
 
     <main class="app-container">
@@ -94,44 +33,7 @@
         <div class="taskflow-layout">
           <!-- 左側：タスク追加エリア -->
           <aside class="taskflow-sidebar">
-            <section class="task-form-panel">
-              <h2>＋ 新しいタスク</h2>
 
-              <div class="task-form">
-                <label for="taskInput">タスク名</label>
-                <input
-                  type="text"
-                  id="taskInput"
-                  placeholder="やることを入力"
-                />
-
-                <label for="deadlineInput">締切</label>
-                <input type="date" id="deadlineInput" />
-                <label class="deadline-option"><input type="checkbox" id="noDeadlineInput" />締切を決めない</label>
-                <label for="plannedDateInput">取り組む予定日（任意）</label>
-                <input type="date" id="plannedDateInput" />
-                <label for="categoryInput">分類（任意・自由入力）</label>
-                <input type="text" id="categoryInput" list="categoryOptions" maxlength="40" placeholder="大学・仕事・私生活など" />
-                <div id="categorySuggestions" class="category-suggestions" role="group" aria-label="既存の分類を選ぶ"></div>
-
-                <label for="priorityInput">重要度</label>
-                <select id="priorityInput">
-                  <option value="high">高</option>
-                  <option value="medium" selected>中</option>
-                  <option value="low">低</option>
-                </select>
-
-                <label for="sizeInput">作業規模</label>
-                <select id="sizeInput">
-                  <option value="short">短い</option>
-                  <option value="normal" selected>普通</option>
-                  <option value="long">長い</option>
-                  <option value="veryLong">かなり長い</option>
-                </select>
-
-                <button id="addButton">タスクを追加</button>
-              </div>
-            </section>
 
             <!-- ===== 達成履歴 ===== -->
 
@@ -322,6 +224,68 @@
 
         <p id="emptyTaskMessage" hidden>条件に一致するタスクはありません。</p>
       </section>
+<section id="backupScreen" hidden tabindex="-1"><h2>バックアップ・使い方</h2>    <section class="backup-controls" aria-label="データ管理">
+      <button id="exportButton" type="button" aria-controls="backupPreview" aria-expanded="false">バックアップを作成・保存</button>
+      <button id="importButton" type="button">バックアップから復元</button>
+      <input id="importFile" type="file" accept=".json,application/json" hidden />
+      <p>復元すると現在の全データを置き換えます。先にバックアップを保存してください。</p>
+      <details class="info-panel">
+        <summary>コピーした文章から復元する</summary>
+        <p>別のブラウザーから持ち出したバックアップ全文を貼り付けてください。現在の全データを置き換える前に確認します。</p>
+        <label for="importBackupText">バックアップ全文（JSON）</label>
+        <textarea id="importBackupText" rows="5" spellcheck="false" autocapitalize="off"></textarea>
+        <button id="importTextButton" type="button">この文章から復元する</button>
+      </details>
+      <div id="backupPreview" class="info-panel" hidden>
+        <h2>データの控えを保存する</h2>
+        <button id="closeBackupButton" type="button">閉じる</button>
+        <p id="backupSummary"></p>
+        <ul id="backupTaskPreview"></ul>
+        <button id="shareBackupButton" type="button" hidden>共有メニューから保存</button>
+        <button id="downloadBackupButton" type="button">ファイルをダウンロード</button>
+        <div id="lineBackupNotice" hidden>
+          <p>LINE内ブラウザーではファイル保存が動かない場合があります。この画面では文章のコピーでデータを持ち出してください。</p>
+          <ol>
+            <li>下の「バックアップ全文をコピー」を押します。失敗したら文章欄を長押しして全選択・コピーします。</li>
+            <li>LINEのメニューから外部ブラウザー（iPhoneはSafariなど）で同じURLを開きます。</li>
+            <li>「コピーした文章から復元する」に全文を貼り付け、確認して復元します。その後、ファイルとして保存できます。</li>
+          </ol>
+          <p>LINE内とSafari・ホーム画面アプリでは保存場所が異なる場合があります。新しい画面でタスクを確認するまで、元のデータを削除しないでください。復元先に既存タスクがある場合は先にそちらもバックアップしてください。</p>
+        </div>
+        <details id="backupTextDetails">
+          <summary>保存できない場合：バックアップを文章でコピー</summary>
+          <p>全文をコピーしてメモアプリなどに保管できます。共有相手に内容を読まれるため、グループトークなどには送らないでください。</p>
+          <label for="backupText">バックアップ全文（変更せずにコピー）</label>
+          <textarea id="backupText" rows="5" readonly spellcheck="false"></textarea>
+          <button id="copyBackupButton" type="button">バックアップ全文をコピー</button>
+        </details>
+        <p>iPhoneでは「共有メニューから保存」→「ファイルに保存」を選びます。最後に「ファイル」アプリで、TaskFlowで始まるJSONファイルがあるか確認してください。</p>
+        <p>外部アプリを開く確認だけで終わる場合は、Safariまたはホーム画面のTaskFlowで開き直して試してください。ダウンロード後は「ファイル」アプリのダウンロード先を確認します。</p>
+        <p>このファイルは暗号化されていません。タスクやメモを含むため、保存先や共有相手に注意してください。</p>
+        <p id="backupSaveStatus" role="status"></p>
+      </div>
+    </section>    <section class="app-guides" aria-label="使い方とデータについて">
+      <details>
+        <summary>使い方</summary>
+        <ol>
+          <li>上部の「＋タスク追加」で入力画面を開き、タスク名を入力します。締切は終える期限、予定日は取り組む日です。どちらも任意です。</li>
+          <li>分類は「大学」「仕事」「私生活」などを選ぶか、自分で入力できます。ホームの進行中タスクやタスク一覧の分類タブで表示を切り替えます。</li>
+          <li>重要度と作業規模を選び、「タスクを追加」を押します。作業規模の目安は短い1日・普通2日・長い4日・かなり長い7日です。</li>
+          <li>予定日があればその日を優先し、なければ締切と残り作業量から着手日を提案します。締切を過ぎたものは今日に表示します。</li>
+          <li>締切・予定日がないタスクは、今日のタスクが少ないときだけ「余裕があれば」と表示します。それ以外も全タスク一覧で確認できます。</li>
+          <li>優先スコアは締切・重要度・残り作業量・進捗による目安です。進捗100％になっても、最後に「完了」を押します。</li>
+          <li>「明日へ移行」で予定を明日に変更できます。間違えたら「移行を取り消す」で戻せます。</li>
+          <li>タスクの変更は自動保存、振り返りメモは「振り返りを保存」で保存します。予定日に自動通知する機能はまだありません。</li>
+        </ol>
+      </details>
+      <details>
+        <summary>データの保存先・安全性・バックアップ</summary>
+        <p>入力したタスクとメモは、この端末のブラウザー・ホーム画面アプリ内に保存します。現在、タスクやメモをサーバーへ送る処理や、他の利用者との自動共有・端末間同期はありません。画面ファイルの取得や更新には通信します。</p>
+        <p>端末内保存は暗号化された保管庫として設計していません。共用端末や機密情報の登録には注意してください。端末の故障、サイトデータの削除、保存領域の整理などで失われる可能性があります。</p>
+        <p>バックアップは、タスクと振り返りメモの「控え」を端末の外にも残せるJSONファイルです。分類で絞っていても全データを含みます。定期的に保存し、公開リポジトリにはアップロードしないでください。</p>
+        <p>復元は、控えの内容で現在の全データを置き換える操作です。読み込む前に確認画面が出ます。URL・端末・起動方法によって保存先が異なる場合は、バックアップで移せます。</p>
+      </details>
+    </section></section>
     </main>
 
     <!-- ===== タスク編集画面 ===== -->
@@ -331,6 +295,9 @@
 
         <label for="editTaskInput">タスク名</label>
         <input type="text" id="editTaskInput" />
+        <p id="editTaskMessage" role="status" hidden></p>
+        <label for="editParentInput">大きなタスク（任意）</label>
+        <select id="editParentInput"><option value="">独立したタスク</option></select>
 
         <label for="editDeadlineInput">締切</label>
         <input type="date" id="editDeadlineInput" />
@@ -364,6 +331,58 @@
       </div>
     </div>
 
+<dialog id="addTaskModal" class="task-dialog" aria-labelledby="addTaskTitle">            <section class="task-form-panel">
+              <h2 id="addTaskTitle">＋ 新しいタスク</h2>
+              <p id="addTaskMessage" role="status" hidden></p>
+
+              <div class="task-form">
+                <label for="taskInput">タスク名</label>
+                <input
+                  type="text"
+                  id="taskInput"
+                  placeholder="やることを入力"
+                />
+
+                <label for="parentInput">大きなタスク（任意）</label>
+                <select id="parentInput"><option value="">独立したタスク</option></select>
+                <label for="deadlineInput">締切</label>
+                <input type="date" id="deadlineInput" />
+                <label class="deadline-option"><input type="checkbox" id="noDeadlineInput" />締切を決めない</label>
+                <label for="plannedDateInput">取り組む予定日（任意）</label>
+                <input type="date" id="plannedDateInput" />
+                <label for="categoryInput">分類（任意・自由入力）</label>
+                <input type="text" id="categoryInput" list="categoryOptions" maxlength="40" placeholder="大学・仕事・私生活など" />
+                <div id="categorySuggestions" class="category-suggestions" role="group" aria-label="既存の分類を選ぶ"></div>
+
+                <label for="priorityInput">重要度</label>
+                <select id="priorityInput">
+                  <option value="high">高</option>
+                  <option value="medium" selected>中</option>
+                  <option value="low">低</option>
+                </select>
+
+                <label for="sizeInput">作業規模</label>
+                <select id="sizeInput">
+                  <option value="short">短い</option>
+                  <option value="normal" selected>普通</option>
+                  <option value="long">長い</option>
+                  <option value="veryLong">かなり長い</option>
+                </select>
+
+                <button id="addButton">タスクを追加</button>
+              </div>
+            </section><button id="cancelAddButton" type="button">閉じる</button></dialog>
+    <dialog id="taskMenu" class="task-dialog task-menu" aria-labelledby="taskMenuTitle">
+      <h2 id="taskMenuTitle">タスクのまとまり</h2>
+      <p>大きなタスクを開くと、中の小さなタスクを確認できます。</p>
+      <div id="taskTree"></div>
+      <button id="closeMenuButton" type="button">閉じる</button>
+    </dialog>
+    <nav class="bottom-nav" aria-label="メインメニュー">
+      <button type="button" data-screen="home" aria-current="page">ホーム</button>
+      <button type="button" data-screen="all">タスク一覧</button>
+      <button type="button" data-screen="backup">バックアップ</button>
+    </nav>
     <script src="script.js"></script>
     <script src="pwa.js"></script>
   </body>

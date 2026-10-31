@@ -30,6 +30,13 @@ const viewAllButton = document.getElementById("viewAllButton");
 
 const homeScreen = document.getElementById("homeScreen");
 const allTasksScreen = document.getElementById("allTasksScreen");
+const backupScreen = document.getElementById("backupScreen");
+const addTaskModal = document.getElementById("addTaskModal");
+const taskMenu = document.getElementById("taskMenu");
+const parentInput = document.getElementById("parentInput");
+const editParentInput = document.getElementById("editParentInput");
+// 折りたたみの開閉は画面内の状態として保持する。
+const expandedTaskIds = new Set();
 const backButton = document.getElementById("backButton");
 
 const allTasksList = document.getElementById("allTasksList");
@@ -98,6 +105,9 @@ function notifyStorage(message) {
   const element = document.getElementById("storageMessage");
   element.textContent = message;
   element.hidden = false;
+  const localMessage = addTaskModal.open ? document.getElementById("addTaskMessage")
+    : !editModal.hidden ? document.getElementById("editTaskMessage") : null;
+  if (localMessage) { localMessage.textContent = message; localMessage.hidden = false; }
 }
 function validDate(value) {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
@@ -131,6 +141,15 @@ function validateData(data) {
   }
   for (const [day, review] of Object.entries(data.dailyReviews)) {
     if (!validDate(day) || !review || typeof review.memo !== "string") throw new Error("Invalid review");
+  }
+  const byId = new Map(data.tasks.map(task => [task.id, task]));
+  for (const task of data.tasks) {
+    if (task.parentId != null && task.parentId !== "") {
+      const parent = byId.get(task.parentId);
+      if (typeof task.parentId !== "string" || !parent || parent === task || parent.parentId) {
+        throw new Error("Invalid parent task");
+      }
+    }
   }
   return data;
 }
@@ -242,6 +261,7 @@ addButton.addEventListener("click", function () {
     title: title,
     plannedDate: plannedDateInput.value || null,
     category: categoryInput.value.trim(),
+    parentId: parentInput.value || null,
     deadline: noDeadlineInput.checked ? "" : deadlineInput.value,
     priority: priorityInput.value,
     size: sizeInput.value,
@@ -252,11 +272,13 @@ addButton.addEventListener("click", function () {
 
   tasks.push(newTask);
   if (!saveTasks()) return;
+  addTaskModal.close();
 
   taskInput.value = "";
   deadlineInput.value = "";
   plannedDateInput.value = "";
   categoryInput.value = "";
+  parentInput.value = "";
   noDeadlineInput.checked = false;
   syncDeadlineInput(noDeadlineInput, deadlineInput);
   priorityInput.value = "medium";
@@ -273,6 +295,11 @@ function completeTask(id) {
 
   if (!task) return;
 
+  if (tasks.some(child => child.parentId === id && !child.completed)) {
+    alert("小さなタスクが残っています。先に中のタスクを完了してください。");
+    return;
+  }
+
   task.completed = true;
   task.progress = 100;
   task.completedAt = new Date().toISOString();
@@ -282,11 +309,15 @@ function completeTask(id) {
 }
 
 function deleteTask(id) {
-  const result = confirm("このタスクを削除しますか？");
+  const hasChildren = tasks.some(task => task.parentId === id);
+  const result = confirm(hasChildren
+    ? "この大きなタスクを削除しますか？ 中の小さなタスクは削除せず、独立したタスクとして残します。"
+    : "このタスクを削除しますか？");
 
   if (!result) return;
 
   tasks = tasks.filter((task) => task.id !== id);
+  tasks.forEach(task => { if (task.parentId === id) task.parentId = null; });
 
   saveTasks();
   displayTasks();
@@ -302,12 +333,14 @@ function editTask(id) {
   }
 
   editingTaskId = id;
+  document.getElementById("editTaskMessage").hidden = true;
 
   // 現在の設定をフォームに反映
   editTaskInput.value = task.title;
   editDeadlineInput.value = task.deadline || "";
   editPlannedDateInput.value = task.plannedDate || "";
   editCategoryInput.value = task.category || "";
+  populateParentOptions(editParentInput, id, task.parentId || "");
   editNoDeadlineInput.checked = !task.deadline;
   syncDeadlineInput(editNoDeadlineInput, editDeadlineInput);
   editPriorityInput.value = task.priority || "medium";
@@ -316,10 +349,7 @@ function editTask(id) {
   // 編集画面を開く
   modalReturnFocus = document.activeElement;
   editModal.hidden = false;
-  document.querySelector("main").inert = true;
-  document.querySelector(".backup-controls").inert = true;
-  document.querySelector(".app-guides").inert = true;
-  document.querySelector(".category-controls").inert = true;
+  setEditBackgroundInert(true);
   document.body.classList.add("modal-open");
   editTaskInput.focus();
 }
@@ -351,6 +381,7 @@ saveEditButton.addEventListener("click", function () {
   task.size = editSizeInput.value;
   task.plannedDate = editPlannedDateInput.value || null;
   task.category = editCategoryInput.value.trim();
+  task.parentId = editParentInput.value || null;
 
   // 手動予定日は編集内容を維持し、変更前の移行履歴だけを無効にする。
   if (oldDeadline !== task.deadline || oldSize !== task.size || oldPlannedDate !== (task.plannedDate || "")) {
@@ -596,11 +627,13 @@ function createTaskCard(task) {
   taskInfo.className = "task-info";
 
   taskInfo.appendChild(title);
-  taskInfo.appendChild(details);
+  const foldedInfo = document.createElement("div");
+  foldedInfo.className = "task-folded-info";
+  foldedInfo.appendChild(details);
   if (task.category) {
     const category = document.createElement("small");
     category.textContent = `分類：${task.category}`;
-    taskInfo.appendChild(category);
+    foldedInfo.appendChild(category);
   }
 
   // ===== 移行回数の表示 =====
@@ -611,7 +644,7 @@ function createTaskCard(task) {
     migrationText.className = "migration-text";
     migrationText.textContent = `↪ ${task.migrationCount}回移行済み`;
 
-    taskInfo.appendChild(migrationText);
+    foldedInfo.appendChild(migrationText);
   }
 
   // ===== 優先スコア表示 =====
@@ -664,11 +697,11 @@ function createTaskCard(task) {
     scheduleText.textContent = `残り作業目安：${remainingDays}日 | おすすめ開始日：${startDate}`;
   }
 
-  taskInfo.appendChild(scheduleText);
+  foldedInfo.appendChild(scheduleText);
   if (task.plannedDate) {
     const planned = document.createElement("small");
     planned.textContent = `手動予定日：${task.plannedDate}（締切超過時は今日を優先）`;
-    taskInfo.appendChild(planned);
+    foldedInfo.appendChild(planned);
   }
 
   // 進捗エリア
@@ -732,8 +765,52 @@ function createTaskCard(task) {
   if (canUndoMigration(task)) buttonGroup.appendChild(createUndoMigrationButton(task));
 
   li.appendChild(taskInfo);
-  li.appendChild(progressContainer);
-  li.appendChild(buttonGroup);
+  const controls = document.createElement("details");
+  controls.className = "task-accordion";
+  controls.open = expandedTaskIds.has(task.id);
+  const summary = document.createElement("summary");
+  summary.textContent = "詳細・進捗・操作";
+  controls.appendChild(summary);
+  controls.appendChild(foldedInfo);
+  controls.appendChild(progressContainer);
+  const addChild = document.createElement("button");
+  addChild.type = "button";
+  addChild.textContent = "＋ 小さなタスクを追加";
+  addChild.addEventListener("click", () => openAddTaskModal(task.id));
+  if (!task.parentId) buttonGroup.appendChild(addChild);
+  controls.appendChild(buttonGroup);
+  controls.addEventListener("toggle", () => {
+    // 再描画で切り離された旧カードのtoggleは無視する。
+    if (!controls.isConnected) return;
+    if (controls.open) expandedTaskIds.add(task.id);
+    else expandedTaskIds.delete(task.id);
+  });
+  li.appendChild(controls);
+  if (task.parentId) {
+    const parentLabel = document.createElement("small");
+    parentLabel.textContent = `大きなタスク：${tasks.find(item => item.id === task.parentId)?.title || "不明"}`;
+    li.appendChild(parentLabel);
+  } else {
+    const children = getVisibleTasks().filter(item => item.parentId === task.id);
+    if (children.length) {
+      const group = document.createElement("details");
+      group.className = "subtask-group";
+      const heading = document.createElement("summary");
+      heading.textContent = `小さなタスク ${children.filter(item => item.completed).length}/${children.length}件完了`;
+      group.appendChild(heading);
+      const list = document.createElement("ul");
+      for (const child of children) {
+        if (!child.completed) list.appendChild(createTaskCard(child));
+        else {
+          const done = document.createElement("li");
+          done.textContent = `✓ ${child.title}`;
+          list.appendChild(done);
+        }
+      }
+      group.appendChild(list);
+      li.appendChild(group);
+    }
+  }
 
   return li;
 }
@@ -788,6 +865,8 @@ function displayCompletedTasks() {
     reopen.addEventListener("click", () => {
       task.completed = false;
       task.completedAt = null;
+      const parent = tasks.find(item => item.id === task.parentId);
+      if (parent?.completed) { parent.completed = false; parent.completedAt = null; }
       if (saveTasks()) displayTasks();
     });
     li.appendChild(reopen);
@@ -1099,6 +1178,9 @@ function jumpToTaskCard(id) {
   if (!target) {
     return;
   }
+  for (let ancestor = target.parentElement; ancestor && ancestor !== allTasksList; ancestor = ancestor.parentElement) {
+    if (ancestor.tagName === "DETAILS") ancestor.open = true;
+  }
 
   // 該当カードまで移動
   target.scrollIntoView({
@@ -1211,7 +1293,8 @@ function displayHomeTasks() {
 
   taskCount.textContent = `（全${activeTasks.length}件）`;
 
-  sortedTasks.slice(0, MAX_VISIBLE_TASKS).forEach(function (task) {
+  const visible = sortedTasks.slice(0, MAX_VISIBLE_TASKS);
+  visible.filter(task => !task.parentId || !visible.some(parent => parent.id === task.parentId)).forEach(function (task) {
     taskList.appendChild(createTaskCard(task));
   });
 
@@ -1251,7 +1334,7 @@ function displayAllTasks() {
 
   allTasksCount.textContent = `${filteredTasks.length}件表示中 / 全${activeTasks.length}件`;
 
-  filteredTasks.forEach(function (task) {
+  filteredTasks.filter(task => !task.parentId || !filteredTasks.some(parent => parent.id === task.parentId)).forEach(function (task) {
     allTasksList.appendChild(createTaskCard(task));
   });
 
@@ -1262,6 +1345,8 @@ function displayAllTasks() {
 
 function displayTasks() {
   refreshCategoryOptions();
+  populateParentOptions(parentInput, null, parentInput.value);
+  renderTaskTree();
   displayHomeTasks();
   displayAllTasks();
   displayCompletedTasks();
@@ -1325,10 +1410,16 @@ function refreshCategoryOptions() {
 /* ===== 画面切り替え ===== */
 
 function showScreen(screen) {
+  if (!["home", "all", "backup"].includes(screen)) return;
   currentScreen = screen;
 
   homeScreen.hidden = screen !== "home";
   allTasksScreen.hidden = screen !== "all";
+  backupScreen.hidden = screen !== "backup";
+  for (const button of document.querySelectorAll(".bottom-nav [data-screen]")) {
+    if (button.dataset.screen === screen) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
+  }
   document.getElementById(screen === "all" ? "allCategorySlot" : "homeCategorySlot")
     .appendChild(document.querySelector(".category-controls"));
 
@@ -1362,13 +1453,10 @@ let modalReturnFocus = null;
 function closeEditModal() {
   editModal.hidden = true;
   editingTaskId = null;
-  document.querySelector("main").inert = false;
-  document.querySelector(".backup-controls").inert = false;
-  document.querySelector(".app-guides").inert = false;
-  document.querySelector(".category-controls").inert = false;
+  setEditBackgroundInert(false);
   document.body.classList.remove("modal-open");
   if (modalReturnFocus?.isConnected) modalReturnFocus.focus();
-  else (currentScreen === "all" ? backButton : taskInput).focus();
+  else document.getElementById("openAddButton").focus();
 }
 editModal.addEventListener("keydown", event => {
   if (event.key === "Escape") closeEditModal();
@@ -1547,14 +1635,90 @@ function restoreBackupText(text) {
   }
 }
 
-// 要素自体を移動し、表示件数やボタンの状態を維持する。
-const mobileLayout = window.matchMedia("(max-width: 900px)");
-function positionCompletedPanel() {
-  document.getElementById(mobileLayout.matches ? "mobileCompletedSlot" : "desktopCompletedSlot")
-    .appendChild(document.getElementById("completedPanel"));
+// ホームは画面幅によらず今日のタスクを先頭にする。
+document.getElementById("mobileCompletedSlot").appendChild(document.getElementById("completedPanel"));
+
+function setEditBackgroundInert(value) {
+  for (const selector of ["main", ".app-header", ".bottom-nav"]) {
+    document.querySelector(selector).inert = value;
+  }
 }
-positionCompletedPanel();
-mobileLayout.addEventListener("change", positionCompletedPanel);
+function populateParentOptions(select, editingId, selected = "") {
+  const editingTask = tasks.find(task => task.id === editingId);
+  const hasChildren = editingId != null && tasks.some(task => task.parentId === editingId);
+  select.innerHTML = "";
+  const independent = document.createElement("option");
+  independent.value = "";
+  independent.textContent = "独立したタスク";
+  select.appendChild(independent);
+  if (!hasChildren) {
+    for (const task of tasks.filter(task => !task.parentId && !task.completed && task.id !== editingId)) {
+      const option = document.createElement("option");
+      option.value = task.id;
+      option.textContent = task.title;
+      select.appendChild(option);
+    }
+  }
+  // 完了済みの親との既存の関係は編集で勝手に外さない。
+  const oldParent = tasks.find(task => task.id === editingTask?.parentId);
+  if (oldParent?.completed) {
+    const option = document.createElement("option");
+    option.value = oldParent.id;
+    option.textContent = `${oldParent.title}（完了済み）`;
+    select.appendChild(option);
+  }
+  select.value = selected;
+  if (select.selectedIndex === -1) select.value = "";
+}
+function openAddTaskModal(parentId = null) {
+  document.getElementById("addTaskMessage").hidden = true;
+  const parent = tasks.find(task => task.id === parentId && !task.completed && !task.parentId);
+  populateParentOptions(parentInput, null, parent?.id || "");
+  if (parent) categoryInput.value = parent.category || "";
+  if (taskMenu.open) taskMenu.close();
+  addTaskModal.showModal();
+  taskInput.focus();
+}
+document.getElementById("openAddButton").addEventListener("click", () => openAddTaskModal());
+document.getElementById("cancelAddButton").addEventListener("click", () => addTaskModal.close());
+document.getElementById("menuButton").addEventListener("click", () => {
+  renderTaskTree();
+  taskMenu.showModal();
+});
+document.getElementById("closeMenuButton").addEventListener("click", () => taskMenu.close());
+for (const button of document.querySelectorAll(".bottom-nav [data-screen]")) {
+  button.addEventListener("click", () => showScreen(button.dataset.screen));
+}
+function renderTaskTree() {
+  const tree = document.getElementById("taskTree");
+  tree.innerHTML = "";
+  const roots = tasks.filter(task => !task.parentId && !task.completed);
+  if (!roots.length) tree.textContent = "未完了のタスクはありません。＋タスク追加から登録できます。";
+  for (const root of roots) {
+    const branch = document.createElement("details");
+    const summary = document.createElement("summary");
+    summary.textContent = root.title;
+    branch.appendChild(summary);
+    for (const task of [root, ...tasks.filter(task => task.parentId === root.id && !task.completed)]) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = task === root ? "このタスクを開く" : `↳ ${task.title}`;
+      button.addEventListener("click", () => {
+        taskMenu.close();
+        selectedCategory = "";
+        displayTasks();
+        jumpToTaskCard(task.id);
+      });
+      branch.appendChild(button);
+    }
+    const add = document.createElement("button");
+    add.type = "button";
+    add.textContent = "＋ 小さなタスクを追加";
+    add.addEventListener("click", () => openAddTaskModal(root.id));
+    branch.appendChild(add);
+    tree.appendChild(branch);
+  }
+}
 
 showScreen("home");
 displayTasks();

@@ -1192,3 +1192,37 @@ li button {
 @media (prefers-reduced-motion: reduce) {
   .task-highlight { animation: none; outline: 3px solid #93c5fd; }
 }
+
+/* 今日のタスクを先頭に置くアプリ用の画面構成 */
+body { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+.app-header { display: flex; align-items: center; gap: 12px; max-width: 1200px; }
+.app-header h1 { flex: 1; margin: 0; }
+.app-header button { min-height: 44px; }
+.taskflow-layout { display: block; padding: 0; }
+.taskflow-sidebar { display: none; }
+.app-container { width: 100%; max-width: 1200px; }
+#backupScreen[hidden] { display: none; }
+.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 900; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: white; border-top: 1px solid #d5dbe5; }
+.bottom-nav button { background: #f5f6f8; color: #555; min-height: 48px; padding: 10px 4px; }
+.bottom-nav button[aria-current="page"] { background: #eff6ff; color: #2563eb; font-weight: bold; box-shadow: inset 0 -3px #2563eb; }
+.task-dialog { width: min(520px, calc(100% - 24px)); max-height: 90vh; max-height: 90dvh; overflow-y: auto; border: 0; border-radius: 16px; padding: 24px; background: white; color: #222; }
+.task-dialog::backdrop { background: rgba(0,0,0,.5); }
+.task-dialog[open] { display: block; }
+.task-dialog #cancelAddButton { margin-top: 16px; width: 100%; background: #e5e7eb; color: #374151; }
+body:has(dialog[open]) { overflow: hidden; }
+.task-menu details { border-bottom: 1px solid #e5e7eb; padding: 10px 0; }
+.task-menu summary { min-height: 44px; cursor: pointer; overflow-wrap: anywhere; }
+.task-menu details button { display: block; margin: 8px 0; width: 100%; text-align: left; overflow-wrap: anywhere; }
+.task-accordion { width: 100%; }
+.task-accordion > summary, .subtask-group > summary { cursor: pointer; color: #2563eb; padding: 10px 0; min-height: 44px; }
+.task-folded-info { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; overflow-wrap: anywhere; }
+.task-accordion .button-group { margin-top: 12px; }
+.subtask-group { border-top: 1px solid #e5e7eb; width: 100%; }
+.subtask-group > ul { padding-left: 10px; border-left: 3px solid #dbeafe; }
+#taskList .subtask-group li, #allTasksList .subtask-group li { padding: 12px; }
+@media (max-width: 600px) {
+  .app-header { gap: 8px; }
+  .app-header h1 { font-size: 24px; }
+  .app-header button { padding: 10px; font-size: 13px; }
+  .task-dialog { padding: 20px; }
+}
