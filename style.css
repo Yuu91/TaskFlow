@@ -1205,6 +1205,12 @@ body { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
 .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 900; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: white; border-top: 1px solid #d5dbe5; }
 .bottom-nav button { background: #f5f6f8; color: #555; min-height: 48px; padding: 10px 4px; }
 .bottom-nav button[aria-current="page"] { background: #eff6ff; color: #2563eb; font-weight: bold; box-shadow: inset 0 -3px #2563eb; }
+.completion-undo { position: fixed; z-index: 950; bottom: calc(86px + env(safe-area-inset-bottom)); left: 12px; right: 12px; max-width: 680px; margin: 0 auto; padding: 12px; border-radius: 12px; background: #1e293b; color: white; box-shadow: 0 4px 18px #0003; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.completion-undo[hidden] { display: none; }
+#completionUndoMessage { flex: 1 1 160px; min-width: 0; max-height: 72px; overflow-y: auto; overflow-wrap: anywhere; font-size: 14px; }
+.completion-undo button { min-height: 44px; padding: 8px 12px; }
+#dismissCompletionUndo { background: transparent; border: 1px solid #94a3b8; }
+body:has(.completion-undo:not([hidden])) { padding-bottom: calc(210px + env(safe-area-inset-bottom)); }
 .task-dialog { width: min(520px, calc(100% - 24px)); max-height: 90vh; max-height: 90dvh; overflow-y: auto; border: 0; border-radius: 16px; padding: 24px; background: white; color: #222; }
 .task-dialog::backdrop { background: rgba(0,0,0,.5); }
 .task-dialog[open] { display: block; }
@@ -1225,4 +1231,74 @@ body:has(dialog[open]) { overflow: hidden; }
   .app-header h1 { font-size: 24px; }
   .app-header button { padding: 10px; font-size: 13px; }
   .task-dialog { padding: 20px; }
+}
+
+/* 今日のタスクと締切を続けて確認するホーム */
+#homeScreen { max-width: 760px; margin: 0 auto; }
+.daily-plan-panel, .deadline-chart-panel, .home-accordion {
+  background: white; border: 1px solid #e1e5eb; border-radius: 16px; margin-bottom: 16px; padding: 18px;
+}
+.home-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.home-section-heading h2 { margin: 0; font-size: 20px; }
+.home-section-heading strong { color: #6b7280; font-size: 13px; }
+#todayTaskList .daily-task-item { border: 0; border-top: 1px solid #eef0f3; border-radius: 0; margin: 0; padding: 14px 0; min-height: 66px; }
+#todayTaskList .daily-task-info strong { font-size: 16px; }
+#todayTaskList .daily-task-info { flex: 1; }
+#todayTaskList .daily-task-actions { flex-direction: row; flex-wrap: nowrap; align-items: center; }
+#todayTaskList .daily-score { white-space: nowrap; }
+.score-urgent { background: #fef2f2; color: #dc2626; }
+.score-high { background: #fff7ed; color: #b45309; }
+.score-normal { background: #eff6ff; color: #2563eb; }
+.today-open { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; text-align: left; background: transparent; color: #222; padding: 0; }
+.today-open:focus-visible { outline: 3px solid #60a5fa; outline-offset: 4px; }
+.today-open .daily-task-info { min-width: 0; }
+.suggested-tasks { border-top: 1px dashed #cbd5e1; margin-top: 14px; padding-top: 14px; }
+.suggested-tasks[hidden] { display: none; }
+.suggested-tasks h3 { margin: 0; font-size: 16px; color: #2563eb; }
+.suggested-tasks > p, .field-help { font-size: 12px; color: #64748b; line-height: 1.7; margin: 8px 0; }
+#suggestedTaskList .daily-task-item { border: 0; border-top: 1px solid #eef0f3; margin: 0; padding: 10px 0; }
+#suggestedTaskList .daily-task-info { flex: 1; }
+#suggestedTaskList .daily-task-info small:not(.suggestion-label) { display: none; }
+#suggestedTaskList .daily-task-actions { flex-direction: row; flex-wrap: nowrap; }
+#addTaskAdvanced { padding: 10px 0; }
+#addTaskAdvanced > summary { cursor: pointer; min-height: 44px; color: #2563eb; }
+#addTaskAdvanced > .task-form { margin-top: 8px; }
+.subtask-card .task-info { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.subtask-card .task-info > span:first-child { grid-column: 1; }
+.subtask-card .task-info > .priority-score { grid-column: 1; }
+.subtask-card .task-info > .subtask-complete { grid-column: 2; grid-row: 1 / 3; min-height: 44px; white-space: nowrap; }
+.today-chevron { color: #8892a0; font-size: 26px; }
+#todayTaskList .daily-task-info small:not(.suggestion-label) { display: none; }
+.home-accordion > summary { display: flex; align-items: center; justify-content: space-between; font-size: 16px; font-weight: bold; cursor: pointer; min-height: 36px; list-style: none; }
+.home-accordion > summary::-webkit-details-marker { display: none; }
+.home-accordion > summary::after { content: "⌄"; color: #6b7280; }
+.home-accordion[open] > summary::after { content: "⌃"; }
+.home-accordion[open] > summary { margin-bottom: 16px; }
+.home-accordion .daily-task-panel { margin: 16px 0 0; }
+.home-accordion .review-card:last-child { margin-bottom: 0; }
+#mobileCompletedSlot .completed-preview { padding: 0; margin: 0; border: 0; }
+#mobileCompletedSlot .completed-preview > h2 { display: none; }
+.deadline-chart-panel h2 { margin-bottom: 6px; font-size: 20px; }
+#deadlineChartSummary, .chart-hint, .chart-explanation { font-size: 12px; color: #6b7280; line-height: 1.6; }
+#deadlineChartSummary { margin: 0 0 12px; }
+.deadline-chart-row { display: grid; grid-template-columns: 6em minmax(0,1fr) 3em; gap: 10px; align-items: center; width: 100%; background: transparent; color: #374151; border-radius: 6px; padding: 7px 0; min-height: 40px; text-align: left; font-size: 14px; }
+.deadline-chart-row:hover:not(:disabled) { background: #f8fafc; }
+.deadline-chart-row:focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; }
+.deadline-chart-row:disabled { cursor: default; color: #6b7280; }
+.chart-track { display: block; height: 15px; background: #edf0f4; border-radius: 4px; overflow: hidden; }
+.chart-bar { display: block; height: 100%; border-radius: 4px; background: #2563eb; }
+.deadline-overdue .chart-bar { background: #ef4444; }
+.deadline-today .chart-bar { background: #f59e0b; }
+.deadline-tomorrow .chart-bar { background: #3b82f6; }
+.deadline-later .chart-bar { background: #93c5fd; }
+.deadline-none .chart-bar { background: #9ca3af; }
+.chart-count { text-align: right; font-variant-numeric: tabular-nums; }
+.chart-hint { margin: 10px 0 0; text-align: center; }
+.chart-explanation { margin-top: 8px; }
+.chart-explanation summary { cursor: pointer; }
+#clearDeadlineFilter { margin-top: 8px; background: #eff6ff; color: #2563eb; }
+#clearDeadlineFilter[hidden] { display: none; }
+@media (max-width: 600px) {
+  .daily-plan-panel, .deadline-chart-panel, .home-accordion { padding: 14px; }
+  .deadline-chart-row { gap: 8px; font-size: 13px; }
 }

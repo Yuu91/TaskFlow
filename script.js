@@ -125,6 +125,7 @@ function validateData(data) {
         !["high", "medium", "low"].includes(task.priority) ||
         !["short", "normal", "long", "veryLong"].includes(task.size) ||
         !Number.isFinite(task.progress ?? 0) || (task.progress ?? 0) < 0 || (task.progress ?? 0) > 100 ||
+        (task.progressBeforeCompletion != null && (!Number.isFinite(task.progressBeforeCompletion) || task.progressBeforeCompletion < 0 || task.progressBeforeCompletion > 100)) ||
         typeof task.completed !== "boolean" ||
         (task.completedAt != null && (typeof task.completedAt !== "string" || Number.isNaN(Date.parse(task.completedAt)))) ||
         (task.plannedDate != null && !validDate(task.plannedDate)) ||
@@ -239,6 +240,8 @@ function saveDailyReviews() {
 
 const MAX_VISIBLE_TASKS = 5;
 let currentScreen = "home";
+let showAllToday = false;
+let selectedDeadlineBucket = "";
 
 function saveTasks() {
   return persistData();
@@ -279,6 +282,7 @@ addButton.addEventListener("click", function () {
   plannedDateInput.value = "";
   categoryInput.value = "";
   parentInput.value = "";
+  document.getElementById("addTaskAdvanced").open = false;
   noDeadlineInput.checked = false;
   syncDeadlineInput(noDeadlineInput, deadlineInput);
   priorityInput.value = "medium";
@@ -293,20 +297,49 @@ taskInput.addEventListener("input", () => taskInput.setCustomValidity(""));
 function completeTask(id) {
   const task = tasks.find((task) => task.id === id);
 
-  if (!task) return;
+  if (!task || task.completed) return;
 
   if (tasks.some(child => child.parentId === id && !child.completed)) {
     alert("小さなタスクが残っています。先に中のタスクを完了してください。");
     return;
   }
 
+  task.progressBeforeCompletion = task.progress ?? 0;
   task.completed = true;
   task.progress = 100;
   task.completedAt = new Date().toISOString();
 
-  saveTasks();
+  if (!saveTasks()) return;
   displayTasks();
+  showCompletionUndo(task);
 }
+
+// 自動で消さず、次の完了操作か「閉じる」まで最後の1件を取り消せる。
+let lastCompletion = null;
+function showCompletionUndo(task) {
+  lastCompletion = { id: task.id, completedAt: task.completedAt };
+  document.getElementById("completionUndoMessage").textContent = `「${task.title}」を完了しました。`;
+  document.getElementById("completionUndo").hidden = false;
+}
+function hideCompletionUndo() {
+  lastCompletion = null;
+  document.getElementById("completionUndo").hidden = true;
+}
+document.getElementById("undoCompletionButton").addEventListener("click", () => {
+  const task = tasks.find(item => item.id === lastCompletion?.id);
+  if (!task?.completed || task.completedAt !== lastCompletion.completedAt) {
+    hideCompletionUndo();
+    return;
+  }
+  restoreIncompleteTask(task);
+  const parent = tasks.find(item => item.id === task.parentId);
+  if (parent?.completed) restoreIncompleteTask(parent);
+  if (!saveTasks()) return;
+  hideCompletionUndo();
+  displayTasks();
+  notifyStorage(`「${task.title}」の完了を取り消し、元の進捗に戻しました。`);
+});
+document.getElementById("dismissCompletionUndo").addEventListener("click", hideCompletionUndo);
 
 function deleteTask(id) {
   const hasChildren = tasks.some(task => task.parentId === id);
@@ -426,6 +459,7 @@ function sortByDeadline(taskArray) {
 
 function sortTasks(taskArray, sortType) {
   const sorted = [...taskArray];
+  if (sortType === "recommendation") return sortByRecommendation(sorted);
 
   if (sortType === "deadline") {
     return sortByDeadline(sorted);
@@ -655,17 +689,30 @@ function createTaskCard(task) {
   scoreBadge.className = "priority-score";
 
   if (priorityScore >= 75) {
-    scoreBadge.textContent = `最優先・${priorityScore}点`;
+    scoreBadge.textContent = `最優先・優先度スコア${priorityScore}`;
     scoreBadge.classList.add("priority-urgent");
   } else if (priorityScore >= 50) {
-    scoreBadge.textContent = `優先・${priorityScore}点`;
+    scoreBadge.textContent = `優先・優先度スコア${priorityScore}`;
     scoreBadge.classList.add("priority-high");
   } else {
-    scoreBadge.textContent = `通常・${priorityScore}点`;
+    scoreBadge.textContent = `通常・優先度スコア${priorityScore}`;
     scoreBadge.classList.add("priority-normal");
   }
 
   taskInfo.appendChild(scoreBadge);
+  const scoreExplanation = document.createElement("small");
+  scoreExplanation.textContent = "優先度スコアは高いほど着手をおすすめします。締切・重要度・残り作業量・進捗から計算する目安で、達成度や本人の評価ではありません。";
+  foldedInfo.appendChild(scoreExplanation);
+  if (task.parentId) {
+    li.classList.add("subtask-card");
+    const quickComplete = document.createElement("button");
+    quickComplete.type = "button";
+    quickComplete.className = "subtask-complete";
+    quickComplete.textContent = "完了";
+    quickComplete.setAttribute("aria-label", `${task.title}を完了にする`);
+    quickComplete.addEventListener("click", () => completeTask(task.id));
+    taskInfo.appendChild(quickComplete);
+  }
 
   // ===== おすすめ開始日を表示 =====
 
@@ -762,6 +809,16 @@ function createTaskCard(task) {
   buttonGroup.appendChild(completeButton);
   buttonGroup.appendChild(editButton);
   buttonGroup.appendChild(deleteButton);
+  const planned = task.plannedDate || calculateStartDate(task);
+  if ((!task.deadline || task.deadline > formatDate(new Date())) &&
+      (planned === null || planned <= formatDate(new Date()))) {
+    const migrate = document.createElement("button");
+    migrate.type = "button";
+    migrate.className = "migrate-button";
+    migrate.textContent = "明日へ移行";
+    migrate.addEventListener("click", () => migrateTaskToTomorrow(task.id));
+    buttonGroup.appendChild(migrate);
+  }
   if (canUndoMigration(task)) buttonGroup.appendChild(createUndoMigrationButton(task));
 
   li.appendChild(taskInfo);
@@ -795,6 +852,7 @@ function createTaskCard(task) {
     if (children.length) {
       const group = document.createElement("details");
       group.className = "subtask-group";
+      group.open = true;
       const heading = document.createElement("summary");
       heading.textContent = `小さなタスク ${children.filter(item => item.completed).length}/${children.length}件完了`;
       group.appendChild(heading);
@@ -863,10 +921,9 @@ function displayCompletedTasks() {
     reopen.type = "button";
     reopen.textContent = "未完了に戻す";
     reopen.addEventListener("click", () => {
-      task.completed = false;
-      task.completedAt = null;
+      restoreIncompleteTask(task);
       const parent = tasks.find(item => item.id === task.parentId);
-      if (parent?.completed) { parent.completed = false; parent.completedAt = null; }
+      if (parent?.completed) restoreIncompleteTask(parent);
       if (saveTasks()) displayTasks();
     });
     li.appendChild(reopen);
@@ -892,6 +949,13 @@ viewAllCompletedButton.addEventListener("click", function () {
 });
 
 /* ===== タスクの移行 ===== */
+function restoreIncompleteTask(task) {
+  task.completed = false;
+  task.completedAt = null;
+  // 旧版で完了したタスクは元の値がないので、保存済みの進捗を維持する。
+  if (task.progressBeforeCompletion != null) task.progress = task.progressBeforeCompletion;
+  delete task.progressBeforeCompletion;
+}
 
 function migrateTaskToTomorrow(id) {
   const task = tasks.find((task) => task.id === id);
@@ -1129,15 +1193,18 @@ function displayDailyPlan() {
   weekTaskList.innerHTML = "";
 
   // 今日のタスク
-  todayTasks.forEach(function (task) {
-    todayTaskList.appendChild(createDailyTaskItem(task));
+  (showAllToday ? todayTasks : todayTasks.slice(0, 3)).forEach(task => {
+    todayTaskList.appendChild(createDailyTaskItem(task, false, true));
   });
-  categorized.suggestions.forEach(task => {
-    todayTaskList.appendChild(createDailyTaskItem(task, true));
-  });
-  if (categorized.suggestions.length > 0) {
-    todayCount.textContent = `${todayTasks.length}件＋おすすめ${categorized.suggestions.length}件`;
-  }
+  const suggestions = document.getElementById("suggestedTaskList");
+  suggestions.innerHTML = "";
+  categorized.suggestions.forEach(task => suggestions.appendChild(createDailyTaskItem(task, true, true)));
+  document.getElementById("suggestedTasksSection").hidden = categorized.suggestions.length === 0;
+  document.getElementById("suggestedTasksCount").textContent = `${categorized.suggestions.length}件`;
+  const more = document.getElementById("showMoreTodayButton");
+  more.hidden = todayTasks.length <= 3;
+  more.textContent = showAllToday ? "最初の3件だけ表示" : `残り${todayTasks.length - 3}件を表示`;
+  more.setAttribute("aria-expanded", String(showAllToday));
 
   // 明日のタスク
   tomorrowTasks.forEach(function (task) {
@@ -1149,7 +1216,7 @@ function displayDailyPlan() {
     weekTaskList.appendChild(createDailyTaskItem(task));
   });
 
-  todayEmptyMessage.hidden = todayTasks.length + categorized.suggestions.length !== 0;
+  todayEmptyMessage.hidden = todayTasks.length !== 0;
 }
 
 /* ===== 今日のプラン用の小さなカード ===== */
@@ -1159,12 +1226,22 @@ function displayDailyPlan() {
 /* ===== 指定したタスクカードへ移動 ===== */
 
 function jumpToTaskCard(id) {
+  const changedConditions = Boolean(taskSearch.value || taskFilter.value !== "all" || selectedDeadlineBucket);
+  expandedTaskIds.add(id);
+  const requestedTask = tasks.find(task => task.id === id);
+  if (requestedTask && !getVisibleTasks().some(task => task.id === id)) {
+    selectedCategory = "";
+    refreshCategoryOptions();
+    notifyStorage("対象タスクを表示するため、分類を「すべて」に変更しました。");
+  }
+  if (changedConditions) notifyStorage("対象タスクを表示するため、検索と締切の絞り込みを解除しました。");
   // 全タスク画面へ切り替える
   showScreen("all");
 
   // 検索や絞り込みを解除する
   taskSearch.value = "";
   taskFilter.value = "all";
+  selectedDeadlineBucket = "";
   // 表示中の分類は維持する。
 
   // タスク一覧を再描画
@@ -1181,6 +1258,8 @@ function jumpToTaskCard(id) {
   for (let ancestor = target.parentElement; ancestor && ancestor !== allTasksList; ancestor = ancestor.parentElement) {
     if (ancestor.tagName === "DETAILS") ancestor.open = true;
   }
+  target.tabIndex = -1;
+  target.focus({ preventScroll: true });
 
   // 該当カードまで移動
   target.scrollIntoView({
@@ -1194,14 +1273,16 @@ function jumpToTaskCard(id) {
   target.classList.add("task-highlight");
 }
 
-function createDailyTaskItem(task, isSuggestion = false) {
+function createDailyTaskItem(task, isSuggestion = false, compact = false) {
   const li = document.createElement("li");
   li.className = "daily-task-item";
 
   // タスクカードをクリックすると詳細へ移動
   li.classList.add("daily-task-clickable");
-  li.tabIndex = 0;
-  li.setAttribute("role", "button");
+  if (!compact) {
+    li.tabIndex = 0;
+    li.setAttribute("role", "button");
+  }
 
   li.addEventListener("click", function (event) {
     // 移行ボタンを押したときは移動しない
@@ -1245,14 +1326,19 @@ function createDailyTaskItem(task, isSuggestion = false) {
   // 優先スコア
   const score = document.createElement("span");
   score.className = "daily-score";
-  score.textContent = `${calculatePriorityScore(task)}点`;
+  const points = calculatePriorityScore(task);
+  score.textContent = compact ? (points >= 75 ? "最優先" : points >= 50 ? "優先" : "通常") : `優先度スコア${points}`;
+  if (compact) {
+    score.classList.add(points >= 75 ? "score-urgent" : points >= 50 ? "score-high" : "score-normal");
+    score.setAttribute("aria-label", `優先スコア${points}点`);
+  }
 
   // 操作エリア
   const actions = document.createElement("div");
   actions.className = "daily-task-actions";
 
   actions.appendChild(score);
-  if (canUndoMigration(task)) actions.appendChild(createUndoMigrationButton(task));
+  if (!compact && canUndoMigration(task)) actions.appendChild(createUndoMigrationButton(task));
 
   // 今日のタスクにだけ移行ボタンを表示
   const todayText = formatDate(new Date());
@@ -1264,7 +1350,7 @@ function createDailyTaskItem(task, isSuggestion = false) {
   // 締切が今日以前なら明日へ移行できない
   const canMigrate = !task.deadline || task.deadline > todayText;
 
-  if (isTodayTask && canMigrate) {
+  if (!compact && isTodayTask && canMigrate) {
     const migrateButton = document.createElement("button");
 
     migrateButton.textContent = "明日へ移行";
@@ -1277,8 +1363,24 @@ function createDailyTaskItem(task, isSuggestion = false) {
     actions.appendChild(migrateButton);
   }
 
-  li.appendChild(info);
-  li.appendChild(actions);
+  if (compact) {
+    const arrow = document.createElement("span");
+    arrow.textContent = "›";
+    arrow.className = "today-chevron";
+    arrow.setAttribute("aria-hidden", "true");
+    actions.appendChild(arrow);
+    const open = document.createElement("button");
+    open.type = "button";
+    open.className = "today-open";
+    open.setAttribute("aria-label", `${task.title}の詳細を開く`);
+    open.appendChild(info);
+    open.appendChild(actions);
+    open.addEventListener("click", () => jumpToTaskCard(task.id));
+    li.appendChild(open);
+  } else {
+    li.appendChild(info);
+    li.appendChild(actions);
+  }
 
   return li;
 }
@@ -1291,7 +1393,7 @@ function displayHomeTasks() {
   const activeTasks = getVisibleTasks().filter((task) => !task.completed);
   const sortedTasks = sortByDeadline(activeTasks);
 
-  taskCount.textContent = `（全${activeTasks.length}件）`;
+  taskCount.textContent = `（${selectedCategory ? "選択分類" : "全体"}${activeTasks.length}件）`;
 
   const visible = sortedTasks.slice(0, MAX_VISIBLE_TASKS);
   visible.filter(task => !task.parentId || !visible.some(parent => parent.id === task.parentId)).forEach(function (task) {
@@ -1313,6 +1415,8 @@ function displayAllTasks() {
   const keyword = taskSearch.value.trim().toLowerCase();
   const filterType = taskFilter.value;
   const sortType = taskSort.value;
+  const deadlineMatches = selectedDeadlineBucket
+    ? new Set(getDeadlineTasks().filter(task => getDeadlineBucket(task) === selectedDeadlineBucket).map(task => task.id)) : null;
 
   let filteredTasks = activeTasks.filter((task) => {
     const matchesSearch = task.title.toLowerCase().includes(keyword);
@@ -1327,23 +1431,33 @@ function displayAllTasks() {
       matchesFilter = !task.deadline;
     }
 
-    return matchesSearch && matchesFilter;
+    const matchesDeadline = !deadlineMatches || deadlineMatches.has(task.id);
+    return matchesSearch && matchesFilter && matchesDeadline;
   });
 
   filteredTasks = sortTasks(filteredTasks, sortType);
 
-  allTasksCount.textContent = `${filteredTasks.length}件表示中 / 全${activeTasks.length}件`;
+  const totalActive = tasks.filter(task => !task.completed).length;
+  const scope = selectedCategory ? `分類「${selectedCategory === "__uncategorized" ? "未分類" : selectedCategory.slice(9)}」` : "全分類";
+  allTasksCount.textContent = `表示対象${filteredTasks.length}件 / ${scope}${activeTasks.length}件 / 全体${totalActive}件（未完了）`;
 
   filteredTasks.filter(task => !task.parentId || !filteredTasks.some(parent => parent.id === task.parentId)).forEach(function (task) {
     allTasksList.appendChild(createTaskCard(task));
   });
 
   emptyTaskMessage.hidden = filteredTasks.length !== 0;
+  document.getElementById("clearDeadlineFilter").hidden = !selectedDeadlineBucket;
+  const status = document.getElementById("deadlineFilterStatus");
+  status.hidden = !selectedDeadlineBucket;
+  status.textContent = selectedDeadlineBucket ? `締切：${deadlineBucketLabels[selectedDeadlineBucket]}（子は必要に応じて親の締切で集計）` : "";
 }
 
 /* ===== 全体の表示更新 ===== */
 
 function displayTasks() {
+  if (lastCompletion && !tasks.some(task => task.id === lastCompletion.id && task.completed && task.completedAt === lastCompletion.completedAt)) {
+    hideCompletionUndo();
+  }
   refreshCategoryOptions();
   populateParentOptions(parentInput, null, parentInput.value);
   renderTaskTree();
@@ -1352,7 +1466,74 @@ function displayTasks() {
   displayCompletedTasks();
   displayDailyPlan();
   displayDailyReview();
+  displayDeadlineChart();
 }
+
+const deadlineBucketLabels = {
+  overdue: "期限切れ", today: "今日", tomorrow: "明日",
+  week: "今週の残り", later: "それ以降", none: "締切なし",
+};
+function getDeadlineTasks() {
+  const parentIds = new Set(tasks.map(task => task.parentId).filter(Boolean));
+  return getVisibleTasks().filter(task => !task.completed && !parentIds.has(task.id));
+}
+function getDeadlineBucket(task, now = new Date()) {
+  const deadline = task.deadline || tasks.find(parent => parent.id === task.parentId)?.deadline;
+  if (!deadline) return "none";
+  const today = formatDate(now);
+  if (deadline < today) return "overdue";
+  if (deadline === today) return "today";
+  if (deadline === formatDate(addDays(now, 1))) return "tomorrow";
+  const end = formatDate(addDays(now, (7 - now.getDay()) % 7));
+  return deadline <= end ? "week" : "later";
+}
+function displayDeadlineChart() {
+  const items = getDeadlineTasks();
+  const counts = Object.fromEntries(Object.keys(deadlineBucketLabels).map(key => [key, 0]));
+  items.forEach(task => counts[getDeadlineBucket(task)]++);
+  const chart = document.getElementById("deadlineChart");
+  chart.innerHTML = "";
+  const largest = Math.max(1, ...Object.values(counts));
+  const now = new Date();
+  document.getElementById("deadlineChartSummary").textContent = `${formatDate(now)} 時点・未完了${items.length}件${selectedCategory ? "（選択中の分類）" : ""}`;
+  for (const [key, label] of Object.entries(deadlineBucketLabels)) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `deadline-chart-row deadline-${key}`;
+    button.disabled = counts[key] === 0;
+    button.setAttribute("aria-label", `${label}が締切のタスク${counts[key]}件を表示`);
+    const name = document.createElement("span");
+    name.className = "chart-label";
+    name.textContent = label;
+    const track = document.createElement("span");
+    track.className = "chart-track";
+    track.setAttribute("aria-hidden", "true");
+    const bar = document.createElement("span");
+    bar.className = "chart-bar";
+    bar.style.width = `${counts[key] / largest * 100}%`;
+    track.appendChild(bar);
+    const count = document.createElement("span");
+    count.className = "chart-count";
+    count.textContent = `${counts[key]}件`;
+    button.appendChild(name); button.appendChild(track); button.appendChild(count);
+    button.addEventListener("click", () => {
+      selectedDeadlineBucket = key;
+      taskSearch.value = "";
+      taskFilter.value = "all";
+      displayAllTasks();
+      showScreen("all");
+    });
+    chart.appendChild(button);
+  }
+}
+document.getElementById("showMoreTodayButton").addEventListener("click", () => {
+  showAllToday = !showAllToday;
+  displayDailyPlan();
+});
+document.getElementById("clearDeadlineFilter").addEventListener("click", () => {
+  selectedDeadlineBucket = "";
+  displayAllTasks();
+});
 
 function getVisibleTasks() {
   const selected = selectedCategory;
@@ -1639,7 +1820,7 @@ function restoreBackupText(text) {
 document.getElementById("mobileCompletedSlot").appendChild(document.getElementById("completedPanel"));
 
 function setEditBackgroundInert(value) {
-  for (const selector of ["main", ".app-header", ".bottom-nav"]) {
+  for (const selector of ["main", ".app-header", ".bottom-nav", ".completion-undo"]) {
     document.querySelector(selector).inert = value;
   }
 }
@@ -1675,6 +1856,7 @@ function openAddTaskModal(parentId = null) {
   const parent = tasks.find(task => task.id === parentId && !task.completed && !task.parentId);
   populateParentOptions(parentInput, null, parent?.id || "");
   if (parent) categoryInput.value = parent.category || "";
+  if (parent) document.getElementById("addTaskAdvanced").open = true;
   if (taskMenu.open) taskMenu.close();
   addTaskModal.showModal();
   taskInput.focus();

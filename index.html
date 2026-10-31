@@ -63,47 +63,30 @@
             <!-- ===== 今日のプラン ===== -->
 
             <section class="daily-plan-panel">
-              <h2>今日のプラン</h2>
-
-              <div class="daily-summary">
-                <div class="summary-card">
-                  <span>今日</span>
-                  <strong id="todayCount">0件</strong>
-                </div>
-
-                <div class="summary-card">
-                  <span>明日</span>
-                  <strong id="tomorrowCount">0件</strong>
-                </div>
-
-                <div class="summary-card">
-                  <span>今週（今日・明日を除く）</span>
-                  <strong id="weekCount">0件</strong>
-                </div>
-              </div>
-
-              <div class="daily-task-panel">
-                <h3>今日やるべきタスク</h3>
-                <ul id="todayTaskList"></ul>
-                <p id="todayEmptyMessage" hidden>
-                  今日着手が必要なタスクはありません。
-                </p>
-              </div>
-
-              <div class="daily-task-panel">
-                <h3>明日から始めるタスク</h3>
-                <ul id="tomorrowTaskList"></ul>
-              </div>
-
-              <div class="daily-task-panel">
-                <h3>今週から始めるタスク</h3>
-                <ul id="weekTaskList"></ul>
-              </div>
+              <div class="home-section-heading"><h2>今日の予定</h2><strong id="todayCount">0件</strong></div>
+              <ul id="todayTaskList"></ul>
+              <p id="todayEmptyMessage" hidden>今日着手が必要なタスクはありません。</p>
+              <button id="showMoreTodayButton" class="view-all-button" type="button" hidden></button>
+              <section id="suggestedTasksSection" class="suggested-tasks" hidden>
+                <div class="home-section-heading"><h3>余裕があれば</h3><strong id="suggestedTasksCount"></strong></div>
+                <p>予定のないタスクからのおすすめです。「今日の予定の残り」には含みません。</p>
+                <ul id="suggestedTaskList"></ul>
+              </section>
             </section>
+            <section class="deadline-chart-panel" aria-labelledby="deadlineChartTitle">
+              <h2 id="deadlineChartTitle">締切の見通し</h2>
+              <p id="deadlineChartSummary"></p>
+              <div id="deadlineChart"></div>
+              <p class="chart-hint">タップしてタスクを確認</p>
+              <details class="chart-explanation"><summary>集計について</summary><p>今日やることは着手予定、このグラフは終える締切です。未完了を重複なしで集計します。子がある親は数えず、小さなタスクを数えます。子の締切がない場合は親の締切を集計に使います。件数は作業量の目安ではありません。</p></details>
+            </section>
+            <details class="home-accordion"><summary>明日・今週の着手予定</summary>
+              <div class="daily-task-panel"><h3>明日 <span id="tomorrowCount"></span></h3><ul id="tomorrowTaskList"></ul></div>
+              <div class="daily-task-panel"><h3>今週（今日・明日を除く） <span id="weekCount"></span></h3><ul id="weekTaskList"></ul></div>
+            </details>
 
             <!-- ===== デイリーレビュー ===== -->
-            <section class="daily-review-panel">
-              <h2>今日の振り返り</h2>
+            <details class="daily-review-panel home-accordion"><summary>今日の振り返り</summary>
 
               <div class="review-summary">
                 <div class="review-summary-card">
@@ -112,7 +95,7 @@
                 </div>
 
                 <div class="review-summary-card">
-                  <span>今日残っているタスク</span>
+                  <span>今日の予定の残り</span>
                   <strong id="reviewRemainingCount">0件</strong>
                 </div>
               </div>
@@ -128,12 +111,13 @@
               </div>
 
               <div class="review-card">
-                <h3>今日残っているタスク</h3>
+                <h3>今日の予定の残り</h3>
+                <p class="field-help">「余裕があれば」のおすすめは、この件数に含みません。</p>
 
                 <ul id="reviewRemainingList"></ul>
 
                 <p id="reviewRemainingEmpty" hidden>
-                  今日残っているタスクはありません。
+                  今日の予定に残っているタスクはありません。
                 </p>
               </div>
 
@@ -153,11 +137,11 @@
 
                 <p id="reviewSaveMessage" hidden>振り返りを保存しました！</p>
               </div>
-            </section>
+            </details>
 
             <!-- ===== 進行中のタスク ===== -->
-            <div id="mobileCompletedSlot"></div>
-            <section class="task-list-panel">
+            <details class="home-accordion"><summary>達成履歴</summary><div id="mobileCompletedSlot"></div></details>
+            <details class="task-list-panel home-accordion"><summary>進行中のタスク・分類</summary>
               <h2>
                 進行中のタスク
                 <span id="taskCount"></span>
@@ -174,7 +158,7 @@
               <button id="viewAllButton" class="view-all-button">
                 すべてのタスクを見る
               </button>
-            </section>
+            </details>
           </div>
           <!-- taskflow-main -->
         </div>
@@ -190,7 +174,7 @@
           <button id="backButton" class="back-button">← ホームに戻る</button>
 
           <h2>すべてのタスク</h2>
-          <p id="allTasksCount"></p>
+          <p id="allTasksCount"></p><p id="deadlineFilterStatus" role="status" hidden></p><button id="clearDeadlineFilter" type="button" hidden>締切の絞り込みを解除</button>
         </div>
 
         <!-- 検索・並び替え・絞り込み -->
@@ -204,7 +188,8 @@
           <div class="control-field">
             <label for="taskSort">並び順</label>
             <select id="taskSort">
-              <option value="deadline">締切が近い順</option>
+              <option value="recommendation">おすすめ順（優先度スコア順）</option>
+              <option value="deadline" selected>締切が近い順</option>
               <option value="priority">重要度が高い順</option>
               <option value="progress">進捗率が高い順</option>
             </select>
@@ -322,6 +307,7 @@
           <option value="long">長い</option>
           <option value="veryLong">かなり長い</option>
         </select>
+        <p class="field-help">規模は開始日を提案するための粗い目安です。短い1日・普通2日・長い4日・かなり長い7日を基に、進捗に応じて残り日数を切り上げます。終日作業する日数や所要時間を保証するものではありません。</p>
 
         <div class="edit-modal-buttons">
           <button id="cancelEditButton" type="button">キャンセル</button>
@@ -343,11 +329,13 @@
                   placeholder="やることを入力"
                 />
 
-                <label for="parentInput">大きなタスク（任意）</label>
-                <select id="parentInput"><option value="">独立したタスク</option></select>
                 <label for="deadlineInput">締切</label>
                 <input type="date" id="deadlineInput" />
                 <label class="deadline-option"><input type="checkbox" id="noDeadlineInput" />締切を決めない</label>
+                <p class="field-help">必須はタスク名だけです。日付を空にするか「締切を決めない」で締切なしにできます。初期値は重要度「中」、作業規模「普通」です。</p>
+                <details id="addTaskAdvanced"><summary>詳しく設定（任意）</summary><div class="task-form">
+                <label for="parentInput">大きなタスク（任意）</label>
+                <select id="parentInput"><option value="">独立したタスク</option></select>
                 <label for="plannedDateInput">取り組む予定日（任意）</label>
                 <input type="date" id="plannedDateInput" />
                 <label for="categoryInput">分類（任意・自由入力）</label>
@@ -369,6 +357,7 @@
                   <option value="veryLong">かなり長い</option>
                 </select>
 
+<p class="field-help">規模は開始日を提案する粗い目安です。短い1日・普通2日・長い4日・かなり長い7日を基に進捗から残り日数を切り上げます。終日作業する日数や所要時間を保証するものではありません。</p></div></details>
                 <button id="addButton">タスクを追加</button>
               </div>
             </section><button id="cancelAddButton" type="button">閉じる</button></dialog>
@@ -378,6 +367,11 @@
       <div id="taskTree"></div>
       <button id="closeMenuButton" type="button">閉じる</button>
     </dialog>
+    <div id="completionUndo" class="completion-undo" hidden>
+      <span id="completionUndoMessage" role="status"></span>
+      <button id="undoCompletionButton" type="button">元に戻す</button>
+      <button id="dismissCompletionUndo" type="button" aria-label="完了通知を閉じる">閉じる</button>
+    </div>
     <nav class="bottom-nav" aria-label="メインメニュー">
       <button type="button" data-screen="home" aria-current="page">ホーム</button>
       <button type="button" data-screen="all">タスク一覧</button>
