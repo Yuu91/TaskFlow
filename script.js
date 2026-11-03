@@ -335,6 +335,7 @@ function hideCompletionUndo() {
   document.getElementById("completionUndo").hidden = true;
 }
 document.getElementById("undoCompletionButton").addEventListener("click", () => {
+  const wasBulk = Boolean(lastCompletion?.bulk);
   const targets = getCompletionUndoTargets();
   if (!targets.length) {
     hideCompletionUndo();
@@ -348,7 +349,9 @@ document.getElementById("undoCompletionButton").addEventListener("click", () => 
   if (!saveTasks()) return;
   hideCompletionUndo();
   displayTasks();
-  notifyStorage(`${targets.length}件の完了を取り消し、元の進捗に戻しました。`);
+  const message = `${targets.length}件の完了を取り消し、元の進捗に戻しました。`;
+  if (wasBulk) document.getElementById("bulkResult").textContent = message;
+  notifyStorage(message);
 });
 function getCompletionUndoTargets() {
   return (lastCompletion?.items || []).map(record => tasks.find(task => task.id === record.id && task.completed && task.completedAt === record.completedAt)).filter(Boolean);

@@ -386,6 +386,28 @@ function runTests(engine, source, pwaSource, report = () => {}) {
     for (const text of ["{", JSON.stringify({ app: "TaskFlow", version: 1, tasks: [task("x"), task("x")], dailyReviews: {} }), backup({ parentId: "a" })]) check(!a.api.restoreBackupText(text), "invalid restore");
     check(storage.get("taskflowData") === raw && a.api.tasks()[0].note === "keep", "original retained");
   });
+  test("bulk completion undo updates both notices and restores progress", () => {
+    const a = app([task("a", { progress: 25 }), task("b", { progress: 60 })]);
+    a.n("toggleSelectionButton").click(); a.n("selectPageButton").click(); a.n("bulkCompleteButton").click();
+    check(a.api.tasks().every(t => t.completed) && a.n("bulkResult").textContent.includes("まとめて取り消せます"), "bulk completion notice");
+    a.n("undoCompletionButton").click();
+    check(a.api.tasks().every(t => !t.completed) && a.api.tasks()[0].progress === 25 && a.api.tasks()[1].progress === 60, "both tasks restored");
+    check(a.n("bulkResult").textContent === a.n("storageMessage").textContent && a.n("bulkResult").textContent.includes("2件の完了を取り消し"), "both notices updated");
+    check(!a.n("bulkResult").textContent.includes("まとめて取り消せます") && a.n("completionUndo").hidden, "no stale action");
+  });
+  test("failed bulk undo does not report a successful cancellation", () => {
+    const a = app([task("a"), task("b")]);
+    a.n("toggleSelectionButton").click(); a.n("selectPageButton").click(); a.n("bulkCompleteButton").click();
+    const result = a.n("bulkResult").textContent; const saved = a.storage.get("taskflowData");
+    a.fail(true); a.n("undoCompletionButton").click();
+    check(a.api.tasks().every(t => t.completed) && a.storage.get("taskflowData") === saved, "failed undo rolls back");
+    check(a.n("bulkResult").textContent === result && !a.n("completionUndo").hidden, "no false success and retry available");
+  });
+  test("single completion undo leaves unrelated bulk notice unchanged", () => {
+    const a = app([task("a")]); a.n("bulkResult").textContent = "以前の一括操作";
+    a.api.completeTask("a"); a.n("undoCompletionButton").click();
+    check(a.n("bulkResult").textContent === "以前の一括操作" && !a.api.tasks()[0].completed, "single undo unchanged");
+  });
   report(`${passed} app tests passed; ${failures.length} failed`);
   if (failures.length) throw new Error(`${failures.length} failed: ${failures.join(", ")}`);
   return passed;
