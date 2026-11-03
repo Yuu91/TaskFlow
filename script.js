@@ -1786,7 +1786,7 @@ function serializeBackup(data) {
 // アプリ内ブラウザーの検出は補助。検出されない環境にも文章コピーを用意する。
 const isLineBrowser = /\bLine\//i.test(navigator.userAgent || "");
 function backupFileName(data) {
-  return `TaskFlow-${data.exportedAt.replace(/[:.]/g, "-")}.json`;
+  return `SeeDonext-${data.exportedAt.replace(/[:.]/g, "-")}.json`;
 }
 function makeBackupFile(data) {
   return new File([serializeBackup(data)], backupFileName(data), { type: "application/json" });
@@ -1884,7 +1884,7 @@ document.getElementById("copyBackupButton").addEventListener("click", async () =
   try {
     if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
     await navigator.clipboard.writeText(text.value);
-    status.textContent = "バックアップ全文をコピーしました。メモアプリへ貼り付けて保管するか、移動先のTaskFlowで文章から復元してください。まだファイル保存はしていません。";
+    status.textContent = "バックアップ全文をコピーしました。メモアプリへ貼り付けて保管するか、移動先のSeeDonextで文章から復元してください。まだファイル保存はしていません。";
   } catch (_) {
     text.focus();
     text.select();
@@ -1915,7 +1915,7 @@ function restoreBackupText(text) {
   try {
     checkBackupSize(new Blob([text]).size);
     const data = JSON.parse(text);
-    if (data.app !== "TaskFlow" || data.version !== 1) throw new Error("対応するTaskFlowのバックアップではありません。");
+    if (data.app !== "TaskFlow" || data.version !== 1) throw new Error("対応するSeeDonext（旧TaskFlow）のバックアップではありません。");
     validateData(data);
     if (!confirm(`タスク${data.tasks.length}件、振り返り${Object.keys(data.dailyReviews).length}日分を復元します。現在の全データと未保存の入力を置き換えますか？`)) return;
     // 元の文字列をそのまま退避。退避に失敗したら復元しない。

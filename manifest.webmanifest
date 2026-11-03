@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "TaskFlow",
-  "short_name": "TaskFlow",
+  "name": "SeeDonext（セドネクスト）",
+  "short_name": "SeeDonext",
   "description": "タスクと毎日の振り返りを端末内に保存するアプリ",
   "lang": "ja",
   "start_url": "./index.html",

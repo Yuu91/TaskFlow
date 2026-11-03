@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TaskFlow</title>
+    <title>SeeDonext（セドネクスト）</title>
     <meta name="theme-color" content="#2563eb" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="TaskFlow" />
+    <meta name="apple-mobile-web-app-title" content="SeeDonext" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png" />
     <link rel="stylesheet" href="style.css" />
@@ -14,7 +14,7 @@
 
   <body>
     <header class="app-header">
-      <button id="menuButton" type="button" aria-label="分類と案内のメニュー" aria-haspopup="dialog" aria-controls="taskMenu">☰</button><h1>TaskFlow</h1><button id="openAddButton" type="button">＋ 追加</button>
+      <button id="menuButton" type="button" aria-label="分類と案内のメニュー" aria-haspopup="dialog" aria-controls="taskMenu">☰</button><h1>SeeDonext</h1><button id="openAddButton" type="button">＋ 追加</button>
 
     </header>
     <div class="pwa-status" role="status">
@@ -273,8 +273,8 @@
           <textarea id="backupText" rows="5" readonly spellcheck="false"></textarea>
           <button id="copyBackupButton" type="button">バックアップ全文をコピー</button>
         </details>
-        <p>iPhoneでは「共有メニューから保存」→「ファイルに保存」を選びます。最後に「ファイル」アプリで、TaskFlowで始まるJSONファイルがあるか確認してください。</p>
-        <p>外部アプリを開く確認だけで終わる場合は、Safariまたはホーム画面のTaskFlowで開き直して試してください。ダウンロード後は「ファイル」アプリのダウンロード先を確認します。</p>
+        <p>iPhoneでは「共有メニューから保存」→「ファイルに保存」を選びます。最後に「ファイル」アプリで、SeeDonextで始まるJSONファイルがあるか確認してください。</p>
+        <p>外部アプリを開く確認だけで終わる場合は、Safariまたはホーム画面のSeeDonextで開き直して試してください。ダウンロード後は「ファイル」アプリのダウンロード先を確認します。</p>
         <p>このファイルは暗号化されていません。タスクやメモを含むため、保存先や共有相手に注意してください。</p>
         <p id="backupSaveStatus" role="status"></p>
       </div>
@@ -285,10 +285,10 @@
           <h3 id="installGuideTitle">スマホにアプリとして追加する方法</h3>
           <p>ホーム画面のアイコンから開くと、アドレスバーのないアプリ風の画面で使えます。初回はオンラインで開き、「オフライン利用可能」の表示を確認してください。</p>
           <h4>iPhone（Safari）</h4>
-          <ol><li>SafariでTaskFlowを開きます。LINE内で開いている場合は、メニューからSafariなどの外部ブラウザーで開いてください。</li><li>共有メニューを開きます。</li><li>「ホーム画面に追加」を選びます。</li><li>表示される場合は「Webアプリとして開く」を有効にして追加します。</li></ol>
+          <ol><li>SafariでSeeDonextを開きます。LINE内で開いている場合は、メニューからSafariなどの外部ブラウザーで開いてください。</li><li>共有メニューを開きます。</li><li>「ホーム画面に追加」を選びます。</li><li>表示される場合は「Webアプリとして開く」を有効にして追加します。</li></ol>
           <h4>Android（Chrome）</h4>
-          <ol><li>ChromeでTaskFlowを開きます。</li><li>右上などのメニューを開きます。</li><li>「アプリをインストール」または「ホーム画面に追加」を選びます。「インストールしてショートカットを作成」などの表示の場合もあります。</li></ol>
-          <p>OSやブラウザーのバージョンによって、名称や位置が異なります。追加後はホーム画面のTaskFlowアイコンから起動してください。Safari・Chromeの通常画面でアドレスバーを強制的に消すことはしません。</p>
+          <ol><li>ChromeでSeeDonextを開きます。</li><li>右上などのメニューを開きます。</li><li>「アプリをインストール」または「ホーム画面に追加」を選びます。「インストールしてショートカットを作成」などの表示の場合もあります。</li></ol>
+          <p>OSやブラウザーのバージョンによって、名称や位置が異なります。追加後はホーム画面のSeeDonextアイコンから起動してください。Safari・Chromeの通常画面でアドレスバーを強制的に消すことはしません。</p>
           <h4>今のデータを安全に移すには</h4>
           <ol><li>現在タスクが見える画面で「バックアップ」から全データの控えを保存します。ファイルが実際に保存されていることを確認してください。</li><li>ホーム画面へ追加し、そのアイコンから一度オンラインで起動します。</li><li>データが表示されない場合だけ、控えを新しい画面で復元します。復元は現在の全データを置き換えるため、新しい画面にもデータがある場合は先にそちらも保存します。</li><li>タスク・メモ・予定日を確認するまで、元のブラウザーのデータを削除しないでください。</li></ol>
           <p>Safari・ホーム画面アプリ・LINE内ブラウザーでは保存場所が分かれる場合があります。自動同期はありません。ファイル保存が使えない場合はバックアップ全文のコピー・貼り付けで移せます。コピーした控えには個人情報が含まれるため、他の人には送らないでください。</p>
