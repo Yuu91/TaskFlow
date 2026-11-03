@@ -38,6 +38,12 @@ const editParentInput = document.getElementById("editParentInput");
 // 折りたたみの開閉は画面内の状態として保持する。
 const expandedTaskIds = new Set();
 const subtaskGroupStates = new Map();
+const taskMemoDrafts = new Map();
+const openTaskMemos = new Set();
+let addDeadlineEdited = false;
+let addFormBaseline = null;
+let editFormBaseline = null;
+const INPUT_DRAFT_KEY = "taskflowInputDrafts";
 const backButton = document.getElementById("backButton");
 
 const allTasksList = document.getElementById("allTasksList");
@@ -129,6 +135,7 @@ function validateData(data) {
   for (const task of data.tasks) {
     if (!task || typeof task.id !== "string" || !task.id || ids.has(task.id) ||
         typeof task.title !== "string" || !task.title.trim() ||
+        (task.note != null && typeof task.note !== "string") ||
         (task.deadline != null && task.deadline !== "" && !validDate(task.deadline)) ||
         !["high", "medium", "low"].includes(task.priority) ||
         !["short", "normal", "long", "veryLong"].includes(task.size) ||
@@ -279,22 +286,15 @@ addButton.addEventListener("click", function () {
     progress: 0,
     completed: false,
     completedAt: null,
+    note: "",
   };
 
   tasks.push(newTask);
   if (!saveTasks()) return;
   addTaskModal.close();
 
-  taskInput.value = "";
-  deadlineInput.value = "";
-  plannedDateInput.value = "";
-  categoryInput.value = "";
-  parentInput.value = "";
-  document.getElementById("addTaskAdvanced").open = false;
-  noDeadlineInput.checked = false;
-  syncDeadlineInput(noDeadlineInput, deadlineInput);
-  priorityInput.value = "medium";
-  sizeInput.value = "normal";
+  resetAddTaskForm();
+  persistInputDrafts();
 
   displayTasks();
 });
@@ -378,6 +378,7 @@ function editTask(id) {
   if (!task) {
     return;
   }
+  if (hasEditTaskDraft() && !confirm("編集中の内容を破棄して、別のタスクを開きますか？")) return;
 
   editingTaskId = id;
   document.getElementById("editParentSearch").value = "";
@@ -393,6 +394,7 @@ function editTask(id) {
   syncDeadlineInput(editNoDeadlineInput, editDeadlineInput);
   editPriorityInput.value = task.priority || "medium";
   editSizeInput.value = task.size || "normal";
+  editFormBaseline = taskFormState(true);
 
   // 編集画面を開く
   modalReturnFocus = document.activeElement;
@@ -440,7 +442,7 @@ saveEditButton.addEventListener("click", function () {
   displayTasks();
 
   // 編集画面を閉じる
-  closeEditModal();
+  closeEditModal(true);
 });
 
 /* ===== 編集をキャンセル ===== */
@@ -464,11 +466,12 @@ function updateProgress(id, newProgress) {
 
 function sortByDeadline(taskArray) {
   return [...taskArray].sort((a, b) => {
-    if (!a.deadline && !b.deadline) return 0;
-    if (!a.deadline) return 1;
-    if (!b.deadline) return -1;
-
-    return a.deadline.localeCompare(b.deadline);
+    const left = TaskFlowRecommendation.effectiveDeadline(a, tasks);
+    const right = TaskFlowRecommendation.effectiveDeadline(b, tasks);
+    if (!left && !right) return 0;
+    if (!left) return 1;
+    if (!right) return -1;
+    return left.localeCompare(right);
   });
 }
 
@@ -538,6 +541,7 @@ function calculateRemainingDays(task) {
 // おすすめ開始日を計算する
 
 function calculateStartDate(task) {
+  task = TaskFlowRecommendation.withDeadline(task, tasks);
   if (!task.deadline) {
     return null;
   }
@@ -563,6 +567,7 @@ function calculateStartDate(task) {
 /* ===== 優先順位の自動計算 ===== */
 
 function calculatePriorityScore(task) {
+  task = TaskFlowRecommendation.withDeadline(task, tasks);
   let score = 0;
 
   // ① 締切によるスコア（最大40点）
@@ -621,6 +626,10 @@ function calculatePriorityScore(task) {
 // スコアが高い順に並べる
 function sortByRecommendation(taskArray) {
   return [...taskArray].sort((a, b) => {
+    // 点数は変えず、作業可能なタスクを先に、確認待ち・親の順にする。
+    const order = { work: 0, confirmation: 1, blocked: 2, completed: 3 };
+    const stateDifference = order[TaskFlowRecommendation.state(a, tasks)] - order[TaskFlowRecommendation.state(b, tasks)];
+    if (stateDifference !== 0) return stateDifference;
     const scoreDifference =
       calculatePriorityScore(b) - calculatePriorityScore(a);
 
@@ -629,20 +638,23 @@ function sortByRecommendation(taskArray) {
     }
 
     // 同点の場合は締切が近い方を優先
-    if (!a.deadline && !b.deadline) return 0;
-    if (!a.deadline) return 1;
-    if (!b.deadline) return -1;
-
-    return a.deadline.localeCompare(b.deadline);
+    const deadlineA = TaskFlowRecommendation.effectiveDeadline(a, tasks);
+    const deadlineB = TaskFlowRecommendation.effectiveDeadline(b, tasks);
+    if (!deadlineA && !deadlineB) return 0;
+    if (!deadlineA) return 1;
+    if (!deadlineB) return -1;
+    return deadlineA.localeCompare(deadlineB);
   });
 }
 
 /* ===== タスクカード作成 ===== */
 
-function createTaskCard(task, listContext = false) {
+function createTaskCard(task, listContext = false, listMatches = null) {
   const li = document.createElement("li");
 
   li.dataset.taskId = task.id;
+  const effectiveDeadline = TaskFlowRecommendation.effectiveDeadline(task, tasks);
+  const taskState = TaskFlowRecommendation.state(task, tasks);
 
   // タスク名
   const title = document.createElement("span");
@@ -666,7 +678,7 @@ function createTaskCard(task, listContext = false) {
 
   details.textContent =
     "締切：" +
-    (task.deadline || "なし") +
+    (effectiveDeadline ? `${effectiveDeadline}${task.deadline ? "" : "（親の締切）"}` : "なし") +
     " | 重要度：" +
     (priorityLabels[task.priority] || "未設定") +
     " | 作業規模：" +
@@ -715,10 +727,17 @@ function createTaskCard(task, listContext = false) {
   }
 
   taskInfo.appendChild(scoreBadge);
+  if (taskState === "confirmation") scoreBadge.textContent = "完了確認";
+  if (taskState === "blocked") scoreBadge.textContent = "まとめタスク";
   scoreBadge.setAttribute("aria-label", `優先度スコア${priorityScore}`);
-  const scoreExplanation = document.createElement("small");
-  scoreExplanation.textContent = `優先度スコア${priorityScore}。高いほど着手をおすすめします。締切・重要度・残り作業量・進捗から計算する目安で、達成度や本人の評価ではありません。`;
-  foldedInfo.appendChild(scoreExplanation);
+  const scoreHelp = document.createElement("details");
+  scoreHelp.className = "score-help";
+  const scoreSummary = document.createElement("summary");
+  scoreSummary.textContent = `優先度スコア ${priorityScore} ⓘ`;
+  const scoreExplanation = document.createElement("p");
+  scoreExplanation.textContent = "高いほど着手をおすすめします。締切・重要度・残り作業量・進捗から計算する目安で、達成度や本人の評価ではありません。";
+  scoreHelp.appendChild(scoreSummary);
+  scoreHelp.appendChild(scoreExplanation);
   if (task.parentId) {
     li.classList.add("subtask-card");
     const quickComplete = document.createElement("button");
@@ -742,13 +761,15 @@ function createTaskCard(task, listContext = false) {
 
   const today = formatDate(new Date());
 
-  if (remainingDays === 0) {
+  if (taskState === "blocked") {
+    scheduleText.textContent = "未完了の小さなタスクがあります。親の編集・進捗管理はできますが、先に子の作業を進めてください。";
+  } else if (remainingDays === 0) {
     scheduleText.textContent = "✓ 作業進捗100%（完了操作待ち）";
 
     scheduleText.classList.add("schedule-finished");
   } else if (startDate === null) {
     scheduleText.textContent = `残り作業目安：${remainingDays}日 | 開始日：未設定`;
-  } else if (task.deadline < today) {
+  } else if (effectiveDeadline < today) {
     scheduleText.textContent = `⚠ 締切超過 | 残り作業目安：${remainingDays}日`;
 
     scheduleText.classList.add("schedule-overdue");
@@ -763,7 +784,7 @@ function createTaskCard(task, listContext = false) {
   foldedInfo.appendChild(scheduleText);
   if (task.plannedDate) {
     const planned = document.createElement("small");
-    planned.textContent = `手動予定日：${task.plannedDate}（締切超過時は今日を優先）`;
+    planned.textContent = `手動予定日：${task.plannedDate}（締切当日・超過時は今日を優先）`;
     foldedInfo.appendChild(planned);
   }
 
@@ -826,7 +847,7 @@ function createTaskCard(task, listContext = false) {
   buttonGroup.appendChild(editButton);
   buttonGroup.appendChild(deleteButton);
   const planned = task.plannedDate || calculateStartDate(task);
-  if ((!task.deadline || task.deadline > formatDate(new Date())) &&
+  if (taskState === "work" && (!effectiveDeadline || effectiveDeadline > formatDate(new Date())) &&
       (planned === null || planned <= formatDate(new Date()))) {
     const migrate = document.createElement("button");
     migrate.type = "button";
@@ -840,14 +861,18 @@ function createTaskCard(task, listContext = false) {
   li.appendChild(taskInfo);
   const metadata = document.createElement("small");
   metadata.className = "card-metadata";
-  metadata.textContent = `締切 ${task.deadline || "なし"} ・進捗 ${task.progress ?? 0}%${task.plannedDate ? ` ・予定 ${task.plannedDate}` : ""}`;
+  metadata.textContent = `締切 ${effectiveDeadline || "なし"}${!task.deadline && effectiveDeadline ? "（親）" : ""} ・${taskState === "confirmation" ? "完了確認待ち" : `進捗 ${task.progress ?? 0}%`}${task.plannedDate ? ` ・予定 ${task.plannedDate}` : ""}`;
   li.appendChild(metadata);
+  li.appendChild(scoreHelp);
+  const memoPanel = createTaskMemo(task);
   const controls = document.createElement("details");
   controls.className = "task-accordion";
   controls.open = expandedTaskIds.has(task.id);
+  memoPanel.hidden = !controls.open;
   const summary = document.createElement("summary");
   summary.textContent = "詳細・進捗・操作";
   controls.appendChild(summary);
+  controls.appendChild(memoPanel);
   controls.appendChild(foldedInfo);
   controls.appendChild(progressContainer);
   const addChild = document.createElement("button");
@@ -856,11 +881,20 @@ function createTaskCard(task, listContext = false) {
   addChild.addEventListener("click", () => openAddTaskModal(task.id));
   if (!task.parentId) buttonGroup.appendChild(addChild);
   controls.appendChild(buttonGroup);
+  let previousControlsOpen = controls.open;
   controls.addEventListener("toggle", () => {
     // 再描画で切り離された旧カードのtoggleは無視する。
     if (!controls.isConnected) return;
-    if (controls.open) expandedTaskIds.add(task.id);
+    memoPanel.hidden = !controls.open;
+    if (controls.open) {
+      expandedTaskIds.add(task.id);
+      if (!previousControlsOpen && (task.note || taskMemoDrafts.has(task.id))) {
+        openTaskMemos.add(task.id);
+        memoPanel.open = true;
+      }
+    }
     else expandedTaskIds.delete(task.id);
+    previousControlsOpen = controls.open;
   });
   li.appendChild(controls);
   if (task.parentId) {
@@ -868,7 +902,7 @@ function createTaskCard(task, listContext = false) {
     parentLabel.textContent = `大きなタスク：${tasks.find(item => item.id === task.parentId)?.title || "不明"}`;
     li.appendChild(parentLabel);
   } else {
-    const children = getVisibleTasks().filter(item => item.parentId === task.id);
+    const children = getVisibleTasks().filter(item => item.parentId === task.id && (!listMatches || listMatches.has(item.id)));
     if (children.length) {
       const group = document.createElement("details");
       group.className = "subtask-group";
@@ -879,7 +913,7 @@ function createTaskCard(task, listContext = false) {
       group.appendChild(heading);
       const list = document.createElement("ul");
       for (const child of children) {
-        if (!child.completed) list.appendChild(createTaskCard(child, listContext));
+        if (!child.completed) list.appendChild(createTaskCard(child, listContext, listMatches));
         else {
           const done = document.createElement("li");
           done.textContent = `✓ ${child.title}`;
@@ -989,6 +1023,8 @@ function migrateTaskToTomorrow(id) {
   today.setHours(0, 0, 0, 0);
 
   const tomorrow = addDays(today, 1);
+  const deadline = TaskFlowRecommendation.effectiveDeadline(task, tasks);
+  if ((deadline && deadline <= formatDate(today)) || TaskFlowRecommendation.state(task, tasks) !== "work") return;
 
   // 次に取り組む予定日を明日に設定
   if (task.plannedDate === formatDate(tomorrow)) return;
@@ -1035,57 +1071,8 @@ function createUndoMigrationButton(task) {
 
 /* ===== 今日・明日・今週の分類 ===== */
 
-function categorizeTasksByDate() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const tomorrow = addDays(today, 1);
-
-  // 今週の日曜日
-  const endOfWeek = addDays(today, (7 - today.getDay()) % 7);
-
-  const todayText = formatDate(today);
-  const tomorrowText = formatDate(tomorrow);
-  const endOfWeekText = formatDate(endOfWeek);
-
-  const result = {
-    today: [],
-    tomorrow: [],
-    week: [],
-    suggestions: [],
-  };
-  const unscheduled = [];
-
-  const activeTasks = getVisibleTasks().filter((task) => !task.completed);
-
-  activeTasks.forEach(function (task) {
-    if (!task.deadline && !task.plannedDate) {
-      unscheduled.push(task);
-      return;
-    }
-    // 手動で移行した予定日があれば優先する
-    const startDate = task.plannedDate || calculateStartDate(task);
-
-    if (startDate === null) {
-      result.today.push(task);
-      return;
-    }
-
-    // 締切超過の場合は移行先より今日を優先
-    if (task.deadline && task.deadline < todayText) {
-      result.today.push(task);
-    } else if (startDate <= todayText) {
-      result.today.push(task);
-    } else if (startDate === tomorrowText) {
-      result.tomorrow.push(task);
-    } else if (startDate > tomorrowText && startDate <= endOfWeekText) {
-      result.week.push(task);
-    }
-  });
-
-  const available = Math.max(0, 3 - result.today.length);
-  result.suggestions = sortByRecommendation(unscheduled).slice(0, available);
-  return result;
+function categorizeTasksByDate(now = new Date()) {
+  return TaskFlowRecommendation.categorize(tasks, getVisibleTasks(), now, calculateStartDate, sortByRecommendation);
 }
 
 /* ===== デイリーレビュー表示 ===== */
@@ -1137,7 +1124,8 @@ function displayDailyReview() {
     li.appendChild(title);
 
     // 締切が今日より先なら移行できる
-    const canMigrate = !task.deadline || task.deadline > today;
+    const deadline = TaskFlowRecommendation.effectiveDeadline(task, tasks);
+    const canMigrate = !deadline || deadline > today;
 
     if (canMigrate) {
       const button = document.createElement("button");
@@ -1177,6 +1165,7 @@ saveReviewButton.addEventListener("click", function () {
   }
 
   reviewSaveMessage.hidden = false;
+  persistInputDrafts();
 });
 
 /* ===== 今日のメモを読み込む ===== */
@@ -1200,6 +1189,12 @@ function displayDailyPlan() {
   const categorized = categorizeTasksByDate();
 
   const todayTasks = sortByRecommendation(categorized.today);
+  const confirmations = sortByRecommendation(categorized.confirmations);
+  document.getElementById("completionChecksSection").hidden = confirmations.length === 0;
+  document.getElementById("completionChecksCount").textContent = `${confirmations.length}\u4ef6`;
+  const checks = document.getElementById("completionChecksList");
+  checks.innerHTML = "";
+  confirmations.forEach(task => checks.appendChild(createDailyTaskItem(task, false, true)));
   const tomorrowTasks = sortByRecommendation(categorized.tomorrow);
   const weekTasks = sortByRecommendation(categorized.week);
 
@@ -1247,6 +1242,8 @@ function displayDailyPlan() {
 /* ===== 指定したタスクカードへ移動 ===== */
 
 function jumpToTaskCard(id) {
+  const memoTask = tasks.find(task => task.id === id);
+  if (memoTask?.note || taskMemoDrafts.has(id)) openTaskMemos.add(id);
   pendingJumpId = id;
   const changedConditions = Boolean(taskSearch.value || taskFilter.value !== "all" || selectedDeadlineBucket);
   expandedTaskIds.add(id);
@@ -1352,6 +1349,7 @@ function createDailyTaskItem(task, isSuggestion = false, compact = false) {
   score.className = "daily-score";
   const points = calculatePriorityScore(task);
   score.textContent = compact ? (points >= 75 ? "最優先" : points >= 50 ? "優先" : "通常") : `優先度スコア${points}`;
+  if (TaskFlowRecommendation.state(task, tasks) === "confirmation") score.textContent = "\u5b8c\u4e86\u78ba\u8a8d";
   if (compact) {
     score.classList.add(points >= 75 ? "score-urgent" : points >= 50 ? "score-high" : "score-normal");
     score.setAttribute("aria-label", `優先スコア${points}点`);
@@ -1372,7 +1370,8 @@ function createDailyTaskItem(task, isSuggestion = false, compact = false) {
   const isTodayTask = plannedDate === null || plannedDate <= todayText;
 
   // 締切が今日以前なら明日へ移行できない
-  const canMigrate = !task.deadline || task.deadline > todayText;
+  const effectiveDeadline = TaskFlowRecommendation.effectiveDeadline(task, tasks);
+  const canMigrate = TaskFlowRecommendation.state(task, tasks) === "work" && (!effectiveDeadline || effectiveDeadline > todayText);
 
   if (!compact && isTodayTask && canMigrate) {
     const migrateButton = document.createElement("button");
@@ -1448,11 +1447,11 @@ function displayAllTasks() {
     let matchesFilter = true;
 
     if (filterType === "hasDeadline") {
-      matchesFilter = Boolean(task.deadline);
+      matchesFilter = Boolean(TaskFlowRecommendation.effectiveDeadline(task, tasks));
     }
 
     if (filterType === "noDeadline") {
-      matchesFilter = !task.deadline;
+      matchesFilter = !TaskFlowRecommendation.effectiveDeadline(task, tasks);
     }
 
     const matchesDeadline = !deadlineMatches || deadlineMatches.has(task.id);
@@ -1491,8 +1490,9 @@ function displayAllTasks() {
     ? `${prefix}${rows.length}${unit}中 ${listPage * LIST_PAGE_SIZE + 1}〜${listPage * LIST_PAGE_SIZE + visibleRows.length}${unit}` : `${prefix}0件`;
   document.getElementById("allTasksCountDetails").textContent = `検索・絞り込み後${filteredTasks.length}タスク / ${scope}${activeTasks.length}件 / 全体${totalActive}件（未完了）。${grouped ? "親と子を同じカードにまとめているため、ページはまとまり（組）で数えます。" : "ページは表示するタスク数で数えます。"}親カード内の子は自動選択しません。`;
 
+  const listMatches = new Set(filteredTasks.map(task => task.id));
   visibleRows.forEach(function (task) {
-    const card = createTaskCard(task, true);
+    const card = createTaskCard(task, true, listMatches);
     if (selectionMode) {
       const label = document.createElement("label");
       label.className = "task-selection";
@@ -1533,6 +1533,9 @@ function displayAllTasks() {
 /* ===== 全体の表示更新 ===== */
 
 function displayTasks() {
+  for (const id of taskMemoDrafts.keys()) {
+    if (!tasks.some(task => task.id === id)) { taskMemoDrafts.delete(id); openTaskMemos.delete(id); }
+  }
   const savedScroll = currentScreen === "all" ? window.scrollY : null;
   if (lastCompletion && !getCompletionUndoTargets().length) {
     hideCompletionUndo();
@@ -1555,18 +1558,10 @@ const deadlineBucketLabels = {
   week: "今週の残り", later: "それ以降", none: "締切なし",
 };
 function getDeadlineTasks() {
-  const parentIds = new Set(tasks.map(task => task.parentId).filter(Boolean));
-  return getVisibleTasks().filter(task => !task.completed && !parentIds.has(task.id));
+  return getVisibleTasks().filter(task => !task.completed && TaskFlowRecommendation.state(task, tasks) !== "blocked");
 }
 function getDeadlineBucket(task, now = new Date()) {
-  const deadline = task.deadline || tasks.find(parent => parent.id === task.parentId)?.deadline;
-  if (!deadline) return "none";
-  const today = formatDate(now);
-  if (deadline < today) return "overdue";
-  if (deadline === today) return "today";
-  if (deadline === formatDate(addDays(now, 1))) return "tomorrow";
-  const end = formatDate(addDays(now, (7 - now.getDay()) % 7));
-  return deadline <= end ? "week" : "later";
+  return TaskFlowRecommendation.bucket(task, tasks, now);
 }
 function displayDeadlineChart() {
   const items = getDeadlineTasks();
@@ -1651,6 +1646,7 @@ function refreshCategoryOptions() {
     button.addEventListener("click", () => {
       selectedCategory = value;
       displayTasks();
+      if (currentScreen === "backup") showScreen("all");
       taskMenu.close();
     });
     tabs.appendChild(button);
@@ -1730,13 +1726,16 @@ function createTaskId() {
 }
 
 let modalReturnFocus = null;
-function closeEditModal() {
+function closeEditModal(saved = false) {
+  if (!saved && hasEditTaskDraft() && !confirm("編集内容を破棄して閉じますか？ 保存する場合はキャンセルして「変更を保存」を押してください。")) return;
   editModal.hidden = true;
   editingTaskId = null;
+  editFormBaseline = null;
   setEditBackgroundInert(false);
   document.body.classList.remove("modal-open");
   if (modalReturnFocus?.isConnected) modalReturnFocus.focus();
   else document.getElementById("openAddButton").focus();
+  persistInputDrafts();
 }
 editModal.addEventListener("keydown", event => {
   if (event.key === "Escape") closeEditModal();
@@ -1763,20 +1762,34 @@ function refreshDay() {
 window.addEventListener("focus", refreshDay);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) refreshDay();
+  else persistInputDrafts();
 });
+window.addEventListener("pagehide", persistInputDrafts);
 setInterval(refreshDay, 30000);
 window.addEventListener("beforeunload", event => {
-  if (reviewDirty) { event.preventDefault(); event.returnValue = ""; }
+  if (reviewDirty || taskMemoDrafts.size > 0 || hasAddTaskDraft() || hasEditTaskDraft()) {
+    persistInputDrafts();
+    event.preventDefault(); event.returnValue = "";
+  }
 });
 
 let preparedBackup = null;
+const MAX_BACKUP_BYTES = 5 * 1024 * 1024;
+function checkBackupSize(size) {
+  if (size > MAX_BACKUP_BYTES) throw new Error("バックアップは5MiB以下にしてください。長いメモなどを別の安全な場所へ控えてから内容を整理し、作り直してください。元データは削除しないでください。");
+}
+function serializeBackup(data) {
+  const text = JSON.stringify(data, null, 2);
+  checkBackupSize(new Blob([text]).size);
+  return text;
+}
 // アプリ内ブラウザーの検出は補助。検出されない環境にも文章コピーを用意する。
 const isLineBrowser = /\bLine\//i.test(navigator.userAgent || "");
 function backupFileName(data) {
   return `TaskFlow-${data.exportedAt.replace(/[:.]/g, "-")}.json`;
 }
 function makeBackupFile(data) {
-  return new File([JSON.stringify(data, null, 2)], backupFileName(data), { type: "application/json" });
+  return new File([serializeBackup(data)], backupFileName(data), { type: "application/json" });
 }
 document.getElementById("exportButton").addEventListener("click", () => {
   if (storageBlocked) {
@@ -1786,10 +1799,24 @@ document.getElementById("exportButton").addEventListener("click", () => {
   const reviews = { ...dailyReviews };
   if (reviewDirty) reviews[reviewDate] = { memo: reviewMemo.value.trim() };
   // プレビュー時点の内容を固定し、表示件数と書き出す内容を一致させる。
-  preparedBackup = JSON.parse(JSON.stringify({ app: "TaskFlow", version: 1, exportedAt: new Date().toISOString(), tasks, dailyReviews: reviews }));
+  let backupText;
+  try {
+    const data = { app: "TaskFlow", version: 1, exportedAt: new Date().toISOString(), tasks, dailyReviews: reviews };
+    backupText = serializeBackup(data);
+    preparedBackup = JSON.parse(backupText);
+  } catch (error) {
+    preparedBackup = null;
+    document.getElementById("backupPreview").hidden = true;
+    document.getElementById("backupText").value = "";
+    document.getElementById("exportButton").setAttribute("aria-expanded", "false");
+    notifyStorage(`バックアップを出力できません。${error.message}`);
+    return;
+  }
   document.getElementById("backupPreview").hidden = false;
   document.getElementById("exportButton").setAttribute("aria-expanded", "true");
   document.getElementById("backupSummary").textContent = `${new Date(preparedBackup.exportedAt).toLocaleString("ja-JP")} 時点：全分類のタスク${tasks.length}件、振り返り${Object.keys(reviews).length}日分。未保存の振り返りメモも含みます。`;
+  if (taskMemoDrafts.size > 0) document.getElementById("backupSummary").textContent += ` 未保存のタスクメモ${taskMemoDrafts.size}件は含みません。各タスクで「メモを保存」を押してから、バックアップを作り直してください。`;
+  if (hasAddTaskDraft() || hasEditTaskDraft()) document.getElementById("backupSummary").textContent += " 入力途中の追加・編集内容は含みません。先に保存してください。";
   const preview = document.getElementById("backupTaskPreview");
   preview.innerHTML = "";
   for (const task of preparedBackup.tasks.slice(0, 20)) {
@@ -1808,7 +1835,7 @@ document.getElementById("exportButton").addEventListener("click", () => {
   document.getElementById("downloadBackupButton").hidden = isLineBrowser;
   document.getElementById("lineBackupNotice").hidden = !isLineBrowser;
   document.getElementById("backupTextDetails").open = isLineBrowser;
-  document.getElementById("backupText").value = JSON.stringify(preparedBackup, null, 2);
+  document.getElementById("backupText").value = backupText;
   document.getElementById("backupSaveStatus").textContent = isLineBrowser
     ? "LINE内で開いています。まずバックアップ全文をコピーしてください。コピーだけではファイル保存は完了しません。"
     : "まだファイルには保存していません。下の保存方法を選んでください。";
@@ -1872,7 +1899,7 @@ importFile.addEventListener("change", async () => {
   importFile.value = "";
   if (!file) return;
   try {
-    if (file.size > 5 * 1024 * 1024) throw new Error("ファイルは5MB以下にしてください。");
+    checkBackupSize(file.size);
     restoreBackupText(await file.text());
   } catch (error) {
     notifyStorage(`ファイルを読み込めませんでした。現在のデータは変更していません。${error.message}`);
@@ -1884,32 +1911,63 @@ document.getElementById("importTextButton").addEventListener("click", () => {
   }
 });
 function restoreBackupText(text) {
+  let committed = false;
   try {
-    if (new Blob([text]).size > 5 * 1024 * 1024) throw new Error("バックアップは5MB以下にしてください。");
+    checkBackupSize(new Blob([text]).size);
     const data = JSON.parse(text);
     if (data.app !== "TaskFlow" || data.version !== 1) throw new Error("対応するTaskFlowのバックアップではありません。");
     validateData(data);
-    if (!confirm(`タスク${data.tasks.length}件、振り返り${Object.keys(data.dailyReviews).length}日分を復元します。現在の全データと未保存メモを置き換えますか？`)) return;
+    if (!confirm(`タスク${data.tasks.length}件、振り返り${Object.keys(data.dailyReviews).length}日分を復元します。現在の全データと未保存の入力を置き換えますか？`)) return;
     // 元の文字列をそのまま退避。退避に失敗したら復元しない。
-    localStorage.setItem("taskflowBeforeRestore", JSON.stringify({
+    const previousRecovery = localStorage.getItem("taskflowBeforeRestore");
+    const previousData = localStorage.getItem(STORAGE_KEY);
+    const recovery = JSON.stringify({
       savedAt: new Date().toISOString(),
-      current: localStorage.getItem(STORAGE_KEY),
+      current: previousData,
       legacyTasks: localStorage.getItem("tasks"),
       legacyReviews: localStorage.getItem("dailyReviews"),
       reviewDate, unsavedMemo: reviewDirty ? reviewMemo.value : null,
-    }));
+    });
     const serialized = JSON.stringify({ app: "TaskFlow", version: 1, tasks: data.tasks, dailyReviews: data.dailyReviews });
-    localStorage.setItem(STORAGE_KEY, serialized);
+    const snapshot = JSON.stringify({ tasks: data.tasks, dailyReviews: data.dailyReviews });
+    let recoveryWritten = false;
+    try {
+      localStorage.setItem("taskflowBeforeRestore", recovery);
+      recoveryWritten = true;
+      localStorage.setItem(STORAGE_KEY, serialized);
+    } catch (error) {
+      // 今回作った退避だけを戻す。元のタスクや過去の退避は削除しない。
+      if (recoveryWritten && localStorage.getItem(STORAGE_KEY) === previousData && localStorage.getItem("taskflowBeforeRestore") === recovery) {
+        try {
+          if (previousRecovery === null) localStorage.removeItem("taskflowBeforeRestore");
+          else localStorage.setItem("taskflowBeforeRestore", previousRecovery);
+        } catch (_) { /* 退避を残し、元データには触れない */ }
+      }
+      if (error.name === "QuotaExceededError" || error.code === 22 || error.code === 1014 || /quota/i.test(error.message)) {
+        throw new Error("端末の空き容量が不足しています。復元前のデータを安全に退避する容量も必要です。現在のデータはそのまま使えます。現在のデータをファイルに控え、別のブラウザーや端末など、空き容量のある環境で復元してください。元のサイトデータは削除しないでください。");
+      }
+      throw error;
+    }
     lastStoredValue = serialized;
     tasks = data.tasks;
     dailyReviews = data.dailyReviews;
-    savedSnapshot = JSON.stringify({ tasks, dailyReviews });
+    savedSnapshot = snapshot;
+    committed = true;
     storageBlocked = false;
+    taskMemoDrafts.clear();
+    openTaskMemos.clear();
+    resetAddTaskForm();
+    closeEditModal(true);
     loadTodayReview();
+    persistInputDrafts();
     displayTasks();
     notifyStorage("バックアップを復元しました。復元前のデータはブラウザー内に退避しています。");
     return true;
   } catch (error) {
+    if (committed) {
+      notifyStorage("データの復元は完了しましたが、画面を更新できませんでした。保存済みデータと復元前の退避は残っています。ページを再読み込みしてください。");
+      return true;
+    }
     notifyStorage(`復元できませんでした。現在のデータは変更していません。${error.message}`);
     return false;
   }
@@ -1956,12 +2014,114 @@ function openAddTaskModal(parentId = null) {
   document.getElementById("parentSearch").value = "";
   document.getElementById("addTaskMessage").hidden = true;
   const parent = tasks.find(task => task.id === parentId && !task.completed && !task.parentId);
-  populateParentOptions(parentInput, null, parent?.id || "");
-  if (parent) categoryInput.value = parent.category || "";
+  const resuming = hasAddTaskDraft();
+  if (resuming && parent && parent.id !== parentInput.value) {
+    if (!confirm("入力途中のタスクがあります。内容を破棄して、別の親の子タスクを作成しますか？")) return;
+    resetAddTaskForm();
+  }
+  const keepDraft = hasAddTaskDraft();
+  populateParentOptions(parentInput, null, keepDraft ? parentInput.value : parent?.id || "");
+  if (parent && !keepDraft) initializeChildDeadline(parent.id);
+  if (parent && !keepDraft) categoryInput.value = parent.category || "";
   if (parent) document.getElementById("addTaskAdvanced").open = true;
+  if (!keepDraft) addFormBaseline = taskFormState();
   if (taskMenu.open) taskMenu.close();
   addTaskModal.showModal();
   taskInput.focus();
+}
+
+function initializeChildDeadline(parentId) {
+  if (addDeadlineEdited) return;
+  const parent = tasks.find(task => task.id === parentId);
+  deadlineInput.value = parent?.deadline || "";
+  noDeadlineInput.checked = !deadlineInput.value;
+  syncDeadlineInput(noDeadlineInput, deadlineInput);
+}
+deadlineInput.addEventListener("input", () => { addDeadlineEdited = true; });
+deadlineInput.addEventListener("change", () => { addDeadlineEdited = true; });
+noDeadlineInput.addEventListener("change", () => { addDeadlineEdited = true; });
+parentInput.addEventListener("change", () => initializeChildDeadline(parentInput.value));
+
+function createTaskMemo(task) {
+  const panel = document.createElement("details");
+  panel.className = "task-memo";
+  panel.open = openTaskMemos.has(task.id);
+  const summary = document.createElement("summary");
+  function updateSummary(note) {
+    const preview = (note || "").replace(/\s+/g, " ").trim();
+    summary.textContent = `${panel.open ? "メモ" : `メモ：${preview ? preview.slice(0, 80) + (preview.length > 80 ? "…" : "") : "未入力（追加できます）"}`}${taskMemoDrafts.has(task.id) ? "（未保存）" : ""}`;
+  }
+  updateSummary(task.note);
+  panel.addEventListener("toggle", () => {
+    updateSummary(tasks.find(item => item.id === task.id)?.note ?? task.note);
+  });
+  summary.addEventListener("click", event => {
+    event.preventDefault();
+    startEditing();
+  });
+  const editor = document.createElement("textarea");
+  editor.rows = 4;
+  editor.value = taskMemoDrafts.get(task.id) ?? task.note ?? "";
+  editor.setAttribute("aria-label", `${task.title}のメモ`);
+  editor.placeholder = "説明や作業の記録など（メモを保存で保存します）";
+  const status = document.createElement("p");
+  status.className = "field-help";
+  status.setAttribute("role", "status");
+  status.textContent = taskMemoDrafts.has(task.id) ? "未保存の変更があります。" : "メモは「メモを保存」で保存します。";
+  editor.addEventListener("input", () => {
+    const current = tasks.find(item => item.id === task.id);
+    if (!current) return;
+    openTaskMemos.add(task.id);
+    if (editor.value === (current.note ?? "")) taskMemoDrafts.delete(task.id);
+    else taskMemoDrafts.set(task.id, editor.value);
+    status.textContent = taskMemoDrafts.has(task.id) ? "未保存の変更があります。" : "保存済みの内容と同じです。";
+    updateSummary(current.note);
+  });
+  const save = document.createElement("button");
+  save.type = "button";
+  save.textContent = "メモを保存";
+  save.addEventListener("click", () => {
+    const current = tasks.find(item => item.id === task.id);
+    if (!current) return;
+    const value = taskMemoDrafts.get(task.id) ?? editor.value;
+    current.note = value;
+    if (!saveTasks()) { status.textContent = "保存できませんでした。入力は残っています。"; return; }
+    taskMemoDrafts.delete(task.id);
+    persistInputDrafts();
+    openTaskMemos.add(task.id);
+    displayTasks();
+    notifyStorage(`「${current.title}」のメモを保存しました。`);
+  });
+  const body = document.createElement("div");
+  body.className = "task-memo-body";
+  body.textContent = task.note || "ここを押すとメモを入力できます。";
+  body.tabIndex = 0;
+  body.setAttribute("role", "button");
+  body.setAttribute("aria-label", `${task.title}のメモを入力する`);
+  function setEditing(editing) {
+    editor.hidden = !editing;
+    save.hidden = !editing;
+    body.hidden = editing;
+    status.hidden = !editing;
+    updateSummary(tasks.find(item => item.id === task.id)?.note ?? task.note);
+  }
+  setEditing(taskMemoDrafts.has(task.id));
+  function startEditing() {
+    openTaskMemos.add(task.id);
+    panel.open = true;
+    setEditing(true);
+    editor.focus();
+  }
+  body.addEventListener("click", startEditing);
+  body.addEventListener("keydown", event => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      startEditing();
+    }
+  });
+  panel.appendChild(summary); panel.appendChild(editor); panel.appendChild(save); panel.appendChild(status);
+  panel.appendChild(body);
+  return panel;
 }
 
 document.getElementById("clearHomeCategory").addEventListener("click", () => {
@@ -2024,7 +2184,10 @@ function runBulkAction(action) {
   const chosenIds = new Set(chosen.map(task => task.id));
   const eligible = chosen.filter(task => {
     if (action === "complete") return !tasks.some(child => child.parentId === task.id && !child.completed && !chosenIds.has(child.id));
-    if (action === "migrate") return (!task.deadline || task.deadline > today) && task.plannedDate !== tomorrow;
+    if (action === "migrate") {
+      const deadline = TaskFlowRecommendation.effectiveDeadline(task, tasks);
+      return TaskFlowRecommendation.state(task, tasks) === "work" && (!deadline || deadline > today) && task.plannedDate !== tomorrow;
+    }
     return true;
   });
   const skipped = chosen.length - eligible.length;
@@ -2065,24 +2228,123 @@ for (const [id, action] of [["bulkCompleteButton", "complete"], ["bulkMigrateBut
 }
 document.getElementById("openAddButton").addEventListener("click", () => openAddTaskModal());
 document.getElementById("cancelAddButton").addEventListener("click", () => addTaskModal.close());
+addTaskModal.addEventListener("close", () => {
+  persistInputDrafts();
+  if (hasAddTaskDraft()) notifyStorage("入力途中のタスクを保持しています。「＋追加」で再開できます。独立したタスクにする場合は、親の選択を「独立したタスク」に変更してください。");
+});
 document.getElementById("menuButton").addEventListener("click", () => {
   taskMenu.showModal();
 });
 document.getElementById("closeMenuButton").addEventListener("click", () => taskMenu.close());
+function openAppGuide(guideId) {
+  if (taskMenu.open) taskMenu.close();
+  showScreen("backup");
+  if (guideId === "installGuide") document.getElementById("usageGuide").open = true;
+  const guide = document.getElementById(guideId);
+  if (guide.tagName === "DETAILS") guide.open = true;
+  (guide.querySelector("summary") || guide).focus();
+  guide.scrollIntoView({ block: "start" });
+}
+document.getElementById("viewInstallGuide").addEventListener("click", () => openAppGuide("installGuide"));
 for (const [buttonId, guideId] of [["menuHelpButton", "usageGuide"], ["menuPrivacyButton", "privacyGuide"]]) {
-  document.getElementById(buttonId).addEventListener("click", () => {
-    taskMenu.close();
-    showScreen("backup");
-    const guide = document.getElementById(guideId);
-    guide.open = true;
-    guide.querySelector("summary").focus();
-    guide.scrollIntoView({ block: "start" });
-  });
+  document.getElementById(buttonId).addEventListener("click", () => openAppGuide(guideId));
 }
 for (const button of document.querySelectorAll(".bottom-nav [data-screen]")) {
   button.addEventListener("click", () => showScreen(button.dataset.screen));
 }
 
+// 保存済みタスクとは別に、同じタブの入力途中だけを一時退避する。
+function taskFormFields(editing = false) {
+  return editing
+    ? ["editTaskInput", "editDeadlineInput", "editNoDeadlineInput", "editPlannedDateInput", "editCategoryInput", "editParentInput", "editPriorityInput", "editSizeInput"]
+    : ["taskInput", "deadlineInput", "noDeadlineInput", "plannedDateInput", "categoryInput", "parentInput", "priorityInput", "sizeInput"];
+}
+function taskFormState(editing = false) {
+  return JSON.stringify(Object.fromEntries(taskFormFields(editing).map(id => {
+    const field = document.getElementById(id);
+    return [id, [field.value, Boolean(field.checked)]];
+  })));
+}
+function applyTaskFormState(state, editing = false) {
+  const values = JSON.parse(state);
+  for (const id of taskFormFields(editing)) {
+    if (!Array.isArray(values[id]) || typeof values[id][0] !== "string" || typeof values[id][1] !== "boolean") throw new Error("Invalid form draft");
+  }
+  for (const id of taskFormFields(editing)) {
+    const field = document.getElementById(id);
+    [field.value, field.checked] = values[id];
+  }
+  syncDeadlineInput(editing ? editNoDeadlineInput : noDeadlineInput, editing ? editDeadlineInput : deadlineInput);
+}
+function hasAddTaskDraft() { return addFormBaseline !== null && taskFormState() !== addFormBaseline; }
+function hasEditTaskDraft() { return editingTaskId !== null && editFormBaseline !== null && taskFormState(true) !== editFormBaseline; }
+function resetAddTaskForm() {
+  taskInput.value = "";
+  deadlineInput.value = "";
+  addDeadlineEdited = false;
+  plannedDateInput.value = "";
+  categoryInput.value = "";
+  parentInput.value = "";
+  noDeadlineInput.checked = false;
+  syncDeadlineInput(noDeadlineInput, deadlineInput);
+  priorityInput.value = "medium";
+  sizeInput.value = "normal";
+  document.getElementById("addTaskAdvanced").open = false;
+  addFormBaseline = taskFormState();
+}
+function persistInputDrafts() {
+  try {
+    const draft = {
+      version: 1,
+      add: hasAddTaskDraft() ? { state: taskFormState(), deadlineEdited: addDeadlineEdited } : null,
+      edit: hasEditTaskDraft() ? { id: editingTaskId, state: taskFormState(true) } : null,
+      memos: [...taskMemoDrafts],
+      review: reviewDirty ? { day: reviewDate, memo: reviewMemo.value } : null,
+    };
+    if (draft.add || draft.edit || draft.memos.length || draft.review) sessionStorage.setItem(INPUT_DRAFT_KEY, JSON.stringify(draft));
+    else sessionStorage.removeItem(INPUT_DRAFT_KEY);
+  } catch (_) {
+    notifyStorage("入力途中の一時退避ができませんでした。画面を閉じる前にタスク・メモを保存してください。入力は現在の画面に残っています。");
+  }
+}
+function restoreInputDrafts() {
+  try {
+    const raw = sessionStorage.getItem(INPUT_DRAFT_KEY);
+    if (!raw) return;
+    const draft = JSON.parse(raw);
+    if (draft.version !== 1) return;
+    if (draft.add) {
+      applyTaskFormState(draft.add.state);
+      addDeadlineEdited = Boolean(draft.add.deadlineEdited);
+      populateParentOptions(parentInput, null, parentInput.value);
+      document.getElementById("addTaskAdvanced").open = true;
+    }
+    if (draft.edit && tasks.some(task => task.id === draft.edit.id)) {
+      editTask(draft.edit.id);
+      applyTaskFormState(draft.edit.state, true);
+      populateParentOptions(editParentInput, editingTaskId, editParentInput.value);
+    }
+    for (const [id, note] of Array.isArray(draft.memos) ? draft.memos : []) {
+      if (typeof id === "string" && typeof note === "string" && tasks.some(task => task.id === id && (task.note ?? "") !== note)) {
+        taskMemoDrafts.set(id, note);
+        openTaskMemos.add(id);
+      }
+    }
+    if (draft.review && validDate(draft.review.day) && typeof draft.review.memo === "string") {
+      reviewDate = draft.review.day;
+      reviewMemo.value = draft.review.memo;
+      reviewDirty = true;
+      document.getElementById("reviewDate").textContent = `${reviewDate} の未保存メモです。内容を確認して保存してください。`;
+    }
+    displayTasks();
+    notifyStorage("入力途中の内容を再開しました。まだタスクデータには保存していません。内容を確認して保存してください。");
+  } catch (_) {
+    notifyStorage("入力途中の内容を再開できませんでした。保存済みのタスクは変更していません。");
+  }
+}
+
 showScreen("home");
 displayTasks();
 loadTodayReview();
+addFormBaseline = taskFormState();
+restoreInputDrafts();

@@ -1,4 +1,23 @@
 (() => {
+  // タスクの保存キーには触れず、閉じた案内だけを別のキーに保存する。
+  const hint = document.getElementById("installHint");
+  const dismissalKey = "taskflowInstallHintDismissed";
+  let dismissed = false;
+  try { dismissed = localStorage.getItem(dismissalKey) === "1"; } catch (_) { /* 保存制限時も起動を止めない */ }
+  const standalone = window.matchMedia("(display-mode: standalone)");
+  function updateInstallHint() {
+    const mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || "") ||
+      (/Macintosh/i.test(navigator.userAgent || "") && navigator.maxTouchPoints > 1);
+    hint.hidden = dismissed || !mobile || standalone.matches || navigator.standalone === true;
+  }
+  updateInstallHint();
+  standalone.addEventListener("change", updateInstallHint);
+  document.getElementById("dismissInstallHint").addEventListener("click", () => {
+    dismissed = true;
+    hint.hidden = true;
+    try { localStorage.setItem(dismissalKey, "1"); } catch (_) { /* この起動中は非表示を維持 */ }
+  });
+  window.addEventListener("appinstalled", () => { hint.hidden = true; });
   const status = document.getElementById("pwaStatus");
   const button = document.getElementById("pwaUpdate");
   if (!window.isSecureContext || !("serviceWorker" in navigator)) {

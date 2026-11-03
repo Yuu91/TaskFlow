@@ -22,6 +22,11 @@
       <button id="pwaUpdate" type="button" hidden>更新する</button>
     </div>
     <p id="storageMessage" role="status" hidden></p>
+    <aside id="installHint" class="install-hint" aria-label="ホーム画面への追加案内" hidden>
+      <span>ホーム画面に追加すると、アプリのように使えます。</span>
+      <button id="viewInstallGuide" type="button">追加方法を見る</button>
+      <button id="dismissInstallHint" type="button" aria-label="追加の案内を閉じる">閉じる</button>
+    </aside>
 
 
     <datalist id="categoryOptions"><option value="大学"></option><option value="仕事"></option><option value="私生活"></option><option value="生活"></option></datalist>
@@ -68,6 +73,11 @@
               <ul id="todayTaskList"></ul>
               <p id="todayEmptyMessage" hidden>今日着手が必要なタスクはありません。</p>
               <button id="showMoreTodayButton" class="view-all-button" type="button" hidden></button>
+              <section id="completionChecksSection" class="suggested-tasks" hidden>
+                <div class="home-section-heading"><h3>完了を確認</h3><strong id="completionChecksCount"></strong></div>
+                <p>進捗100％の未完了タスクです。詳細を開き、完了を確認してください。今日の作業予定・おすすめとは別です。</p>
+                <ul id="completionChecksList"></ul>
+              </section>
               <section id="suggestedTasksSection" class="suggested-tasks" hidden>
                 <div class="home-section-heading"><h3>余裕があれば</h3><strong id="suggestedTasksCount"></strong></div>
                 <p>予定のないタスクからのおすすめです。「今日の予定の残り」には含みません。</p>
@@ -79,7 +89,7 @@
               <p id="deadlineChartSummary"></p>
               <div id="deadlineChart"></div>
               <p class="chart-hint">タップしてタスクを確認</p>
-              <details class="chart-explanation"><summary>集計について</summary><p>今日やることは着手予定、このグラフは終える締切です。未完了を重複なしで集計します。子がある親は数えず、小さなタスクを数えます。子の締切がない場合は親の締切を集計に使います。件数は作業量の目安ではありません。</p></details>
+              <details class="chart-explanation"><summary>集計について</summary><p>今日やることは着手予定、このグラフは終える締切です。未完了を重複なしで集計します。未完了の子がある親は数えず、小さなタスクを数えます。子の締切がない場合は親の締切を集計に使います。件数は作業量の目安ではありません。</p></details>
             </section>
             <details class="home-accordion"><summary>明日・今週の着手予定</summary>
               <div class="daily-task-panel"><h3>明日 <span id="tomorrowCount"></span></h3><ul id="tomorrowTaskList"></ul></div>
@@ -271,6 +281,18 @@
     </section>    <section class="app-guides" aria-label="使い方とデータについて">
       <details id="usageGuide">
         <summary>使い方</summary>
+        <section id="installGuide" tabindex="-1" class="install-guide" aria-labelledby="installGuideTitle">
+          <h3 id="installGuideTitle">スマホにアプリとして追加する方法</h3>
+          <p>ホーム画面のアイコンから開くと、アドレスバーのないアプリ風の画面で使えます。初回はオンラインで開き、「オフライン利用可能」の表示を確認してください。</p>
+          <h4>iPhone（Safari）</h4>
+          <ol><li>SafariでTaskFlowを開きます。LINE内で開いている場合は、メニューからSafariなどの外部ブラウザーで開いてください。</li><li>共有メニューを開きます。</li><li>「ホーム画面に追加」を選びます。</li><li>表示される場合は「Webアプリとして開く」を有効にして追加します。</li></ol>
+          <h4>Android（Chrome）</h4>
+          <ol><li>ChromeでTaskFlowを開きます。</li><li>右上などのメニューを開きます。</li><li>「アプリをインストール」または「ホーム画面に追加」を選びます。「インストールしてショートカットを作成」などの表示の場合もあります。</li></ol>
+          <p>OSやブラウザーのバージョンによって、名称や位置が異なります。追加後はホーム画面のTaskFlowアイコンから起動してください。Safari・Chromeの通常画面でアドレスバーを強制的に消すことはしません。</p>
+          <h4>今のデータを安全に移すには</h4>
+          <ol><li>現在タスクが見える画面で「バックアップ」から全データの控えを保存します。ファイルが実際に保存されていることを確認してください。</li><li>ホーム画面へ追加し、そのアイコンから一度オンラインで起動します。</li><li>データが表示されない場合だけ、控えを新しい画面で復元します。復元は現在の全データを置き換えるため、新しい画面にもデータがある場合は先にそちらも保存します。</li><li>タスク・メモ・予定日を確認するまで、元のブラウザーのデータを削除しないでください。</li></ol>
+          <p>Safari・ホーム画面アプリ・LINE内ブラウザーでは保存場所が分かれる場合があります。自動同期はありません。ファイル保存が使えない場合はバックアップ全文のコピー・貼り付けで移せます。コピーした控えには個人情報が含まれるため、他の人には送らないでください。</p>
+        </section>
         <ol>
           <li>上部の「＋追加」で入力画面を開き、タスク名を入力します。締切は終える期限、予定日は取り組む日です。どちらも任意です。</li>
           <li>分類は「大学」「仕事」「私生活」などを選ぶか、自分で入力できます。左上の☰メニューで表示する分類を切り替えます。</li>
@@ -279,7 +301,8 @@
           <li>締切・予定日がないタスクは、今日のタスクが少ないときだけ「余裕があれば」と表示します。それ以外も全タスク一覧で確認できます。</li>
           <li>優先スコアは締切・重要度・残り作業量・進捗による目安です。進捗100％になっても、最後に「完了」を押します。</li>
           <li>「明日へ移行」で予定を明日に変更できます。間違えたら「移行を取り消す」で戻せます。</li>
-          <li>タスクの変更は自動保存、振り返りメモは「振り返りを保存」で保存します。予定日に自動通知する機能はまだありません。</li>
+          <li>タスクは「タスクを追加」「変更を保存」や各操作ボタンで保存します。タスクメモは「メモを保存」、振り返りメモは「振り返りを保存」を押してください。バックアップには未保存のタスクメモは含まれません。</li>
+          <li>追加画面を閉じても入力途中の内容は残り、「＋追加」で再開できます。同じタブでは入力途中の一時退避も行いますが、スマホの強制終了やブラウザー設定によって復元できない場合があります。画面を離れる前に保存してください。予定日に自動通知する機能はまだありません。</li>
         </ol>
       </details>
       <details id="privacyGuide">
@@ -402,6 +425,7 @@
       <button type="button" data-screen="all">タスク一覧</button>
       <button type="button" data-screen="backup">バックアップ</button>
     </nav>
+    <script src="recommendation.js"></script>
     <script src="script.js"></script>
     <script src="pwa.js"></script>
   </body>

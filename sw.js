@@ -1,7 +1,7 @@
 // 配信ファイルを変更するときは、このバージョンも変更する。
-const CACHE_NAME = "taskflow-shell-v19";
+const CACHE_NAME = "taskflow-shell-v30";
 const SHELL_FILES = [
-  "./index.html", "./style.css", "./script.js", "./pwa.js",
+  "./index.html", "./style.css", "./recommendation.js", "./script.js", "./pwa.js",
   "./manifest.webmanifest", "./icons/icon-192.png",
   "./icons/icon-512.png", "./icons/apple-touch-icon.png",
 ];
