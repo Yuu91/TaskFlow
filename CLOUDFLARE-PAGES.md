@@ -165,3 +165,7 @@ https://support.google.com/adsense/answer/13554116?hl=ja
 既存と同じコマンドでテスト・ビルドします。アプリHTMLのメニューリンク追加で内容ハッシュは変わりますが、Worker本体・キャッシュ戦略・保存形式は変更しません。
 
 公式問い合わせ先の追記（2026-11-04）：サービス概要と、問い合わせメールの返信・内容確認への利用、Gmail受信についてポリシーへ追記。アプリからは既存のポリシーリンク経由で問い合わせ先を参照できる。/privacy/はWorkerの/app/スコープ外のためオンライン閲覧を維持し、Workerやキャッシュ戦略は変更しない。デプロイ時は既存プロジェクトへdist-cloudflare/の中身をアップロードし、/privacy/とフッターのmailto宛先を確認する。
+
+## ads.txt
+
+landing/ads.txt をビルド時に公開ルートの ads.txt へコピーします。既存AdSenseコードの ca-pub-8268684254916846 と一致する pub-8268684254916846 を使用します。再生成は python -B scripts/build_cloudflare.py。Cloudflareへ dist-cloudflare/ の中身を反映後、https://seedonext.pages.dev/ads.txt がHTMLではなく指定の1行を返すことと、AdSense管理画面の案内との一致を確認してください。GitHub Pages用の直下ファイルやWorkerには追加しません。広告枠・自動広告設定は変更しません。今回、デプロイやGoogle側の認識確認は行いません。

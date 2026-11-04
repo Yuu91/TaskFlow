@@ -311,6 +311,26 @@ class BuildTests(unittest.TestCase):
         for name in builder.ADSENSE_PAGES:
             self.assertEqual(len(self.adsense_tags(files[name])), 1)
 
+    def test_ads_txt_is_plain_text_at_site_root_and_matches_publisher(self):
+        files, _ = builder.payload()
+        expected = b"google.com, pub-8268684254916846, DIRECT, f08c47fec0942fa0\n"
+        self.assertEqual(files["ads.txt"], expected)
+        self.assertEqual(files["ads.txt"], (ROOT / "landing/ads.txt").read_bytes())
+        publisher = files["ads.txt"].decode("ascii").strip().split(", ")[1]
+        self.assertEqual(publisher, builder.ADSENSE_CLIENT.removeprefix("ca-"))
+        self.assertNotIn("app/ads.txt", files)
+        self.assertNotIn(b"ads.txt", files["app/sw.js"])
+
+    def test_ads_txt_change_does_not_rotate_app_cache(self):
+        _, before = builder.payload()
+        original = Path.read_bytes
+        def changed(path):
+            data = original(path)
+            return data + b"# QA comment\n" if path == ROOT / "landing/ads.txt" else data
+        with patch.object(Path, "read_bytes", changed):
+            _, after = builder.payload()
+        self.assertEqual(before, after)
+
 
 if __name__ == "__main__":
     unittest.main()

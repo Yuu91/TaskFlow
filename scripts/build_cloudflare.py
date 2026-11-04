@@ -164,6 +164,7 @@ def payload():
         ("migration/index.html", "migration/index.html"), ("404.html", "404.html"),
         ("recovery/index.html", "recovery/index.html"),
         ("privacy/index.html", "privacy/index.html"),
+        ("ads.txt", "ads.txt"),
     ):
         result[destination] = checked(ROOT / "landing" / source).read_bytes()
     assets = checked(ROOT / "landing/assets")
