@@ -167,7 +167,7 @@ class WorkerBrowserTests(unittest.TestCase):
                     if data is None:
                         self.send_error(404)
                         return
-                    kind = "text/javascript" if name.endswith(".js") else "text/css" if name.endswith(".css") else "application/manifest+json" if name.endswith(".webmanifest") else "image/png" if name.endswith(".png") else "text/html"
+                    kind = "text/javascript" if name.endswith(".js") else "text/css" if name.endswith(".css") else "application/manifest+json" if name.endswith(".webmanifest") else "image/png" if name.endswith(".png") else "image/webp" if name.endswith(".webp") else "text/html"
                 self.send_response(200)
                 self.send_header("Content-Type", kind + "; charset=utf-8")
                 self.send_header("Cache-Control", "no-store")
@@ -386,6 +386,23 @@ class WorkerBrowserTests(unittest.TestCase):
             self.assertEqual(tags, [{"src": builder.ADSENSE_SCRIPT + "?client=" + builder.ADSENSE_CLIENT, "async": True, "crossOrigin": "anonymous", "inHead": True}], path)
             self.assertEqual(self.page.evaluate("document.querySelectorAll('script[data-cf-beacon]').length"), 1)
             self.assertEqual(self.page.evaluate("document.querySelectorAll('ins.adsbygoogle').length"), 0)
+
+    def test_landing_screenshots_load_without_overflow_at_phone_tablet_and_desktop_widths(self):
+        for width in [360, 390, 768, 1280]:
+            self.page.call("Emulation.setDeviceMetricsOverride", {"width":width,"height":900,"deviceScaleFactor":1,"mobile":width < 600})
+            result = self.page.call("Page.navigate", {"url": self.base + "/"})
+            self.assertNotIn("errorText", result)
+            self.page.wait("document.readyState === 'complete'")
+            self.page.evaluate("document.querySelectorAll('.app-screenshot').forEach(image=>image.scrollIntoView());document.getElementById('screen-title').scrollIntoView()")
+            self.page.wait("Array.from(document.querySelectorAll('.app-screenshot')).length===2 && Array.from(document.querySelectorAll('.app-screenshot')).every(i=>i.complete && i.naturalWidth>0)")
+            images = self.page.evaluate("""Array.from(document.querySelectorAll('.app-screenshot')).map(i=>({alt:i.alt,actual:[i.naturalWidth,i.naturalHeight],declared:[Number(i.getAttribute('width')),Number(i.getAttribute('height'))],fits:i.getBoundingClientRect().left>=0 && i.getBoundingClientRect().right<=innerWidth}))""")
+            for image in images:
+                self.assertEqual(image["actual"], image["declared"], width)
+                self.assertTrue(image["fits"], width)
+                self.assertGreater(len(image["alt"]), 20)
+            self.assertTrue(self.page.evaluate("document.documentElement.scrollWidth <= innerWidth"), width)
+            self.assertEqual(self.page.evaluate("document.querySelectorAll('script[data-cf-beacon]').length"), 1)
+            self.assertEqual(self.page.evaluate("document.head.querySelectorAll('script[src*=googlesyndication]').length"), 1)
 
 
 if __name__ == "__main__":

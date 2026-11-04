@@ -240,6 +240,42 @@ class BuildTests(unittest.TestCase):
         for name in ["script.js", "pwa.js", "recommendation.js"]:
             self.assertEqual(files["app/" + name], (ROOT / name).read_bytes())
 
+    def test_landing_screenshots_are_real_image_assets_with_accessible_markup(self):
+        files, _ = builder.payload()
+        class Images(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.items = []
+            def handle_starttag(self, tag, attrs):
+                item = dict(attrs)
+                if tag == "img" and "app-screenshot" in item.get("class", "").split():
+                    self.items.append(item)
+        parser = Images()
+        parser.feed(files["index.html"].decode())
+        self.assertEqual(len(parser.items), 2)
+        self.assertNotIn("スクリーンショットは準備中です", files["index.html"].decode())
+        for image in parser.items:
+            self.assertGreater(len(image.get("alt", "")), 20)
+            self.assertEqual(image.get("loading"), "lazy")
+            self.assertEqual(image.get("decoding"), "async")
+            self.assertGreater(int(image["width"]), 0)
+            self.assertGreater(int(image["height"]), 0)
+            name = image["src"].removeprefix("./")
+            data = files[name]
+            self.assertEqual(data, (ROOT / "landing" / name).read_bytes())
+            self.assertTrue(data.startswith(b"RIFF"))
+            self.assertEqual(data[8:12], b"WEBP")
+
+    def test_landing_screenshot_change_does_not_rotate_app_cache(self):
+        _, before = builder.payload()
+        original = Path.read_bytes
+        def changed(path):
+            data = original(path)
+            return data + b"\0" if path == ROOT / "landing/assets/app-home-desktop.webp" else data
+        with patch.object(Path, "read_bytes", changed):
+            _, after = builder.payload()
+        self.assertEqual(before, after)
+
 
 if __name__ == "__main__":
     unittest.main()
