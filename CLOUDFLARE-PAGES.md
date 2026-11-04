@@ -111,3 +111,26 @@ python -B scripts/build_cloudflare.py
 https://developers.cloudflare.com/web-analytics/get-started/
 https://developers.cloudflare.com/web-analytics/faq/
 https://developers.cloudflare.com/speed/observatory/rum-beacon/
+
+## AdSenseサイト所有権確認コード
+
+Cloudflare生成物の /・/app/・/migration/・/recovery/ のhead内に、指定のasyncスクリプト（client: ca-pub-8268684254916846、crossorigin: anonymous）を1個ずつ設置します。設定は scripts/build_cloudflare.py の ADSENSE_CLIENT・ADSENSE_PAGES にあります。再ビルドしても残り、同じ有効なコードの再挿入は行いません。重複・異なるpublisher・head外の既存コードはビルドエラーになります。
+
+Cloudflare Web Analyticsは従来どおり各ページ1個を維持します。404、元のGitHub Pages用HTML、Service Workerの必須キャッシュにはAdSenseコードを追加しません。保存キー・バックアップ形式・タスク操作・Worker本体は変更しません。アプリHTMLの変更で生成キャッシュのハッシュは更新されます。
+
+広告枠（ins.adsbygoogle）、adsbygoogle.push、独自の自動広告有効化コードは追加しません。Google管理画面の設定は変更していません。このスクリプト自体はAdSenseの各機能で共通に使われるため、広告表示をまだ開始しない場合はAdSense管理画面でも対象サイトの自動広告をOFFにしてください。審査や所有権確認の成功は未確認です。
+
+### 再デプロイ・審査申請の確認
+
+1. python -B tests/cloudflare_build_test.py と python -B tests/service_worker_browser_test.py を実行します。
+2. python -B scripts/build_cloudflare.py で再生成します。
+3. Cloudflare Pagesの既存seedonextプロジェクトへ dist-cloudflare/ の中身を本番デプロイします。リポジトリ直下はアップロードしません。
+4. 本番4ページのHTMLソースでhead内のAdSenseコードが1個、Analyticsも1個であることを確認します。古いPWAは更新を適用してください。
+5. AdSenseでseedonext.pages.devの接続確認・審査申請を進めます。自動広告はOFFのままにします。
+
+今回の作業ではデプロイや審査申請は行いません。テスト用ChromeはGoogleとCloudflareの外部スクリプト先をDNS遮断し、実広告・本番計測を発生させずにDOM・保存・オフラインを検証します。本物のGoogleスクリプトの取得、Google側の設定・認識、審査結果、スマホ実機はデプロイ後の確認事項です。
+
+公式資料:
+https://support.google.com/adsense/answer/7584263
+https://support.google.com/adsense/answer/9274634
+https://support.google.com/adsense/answer/9261307

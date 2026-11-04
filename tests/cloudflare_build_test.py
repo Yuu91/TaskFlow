@@ -49,7 +49,7 @@ class BuildTests(unittest.TestCase):
         for name in builder.APP_FILES:
             if name not in {"manifest.webmanifest", "sw.js", "index.html"}:
                 self.assertEqual(files["app/" + name], (ROOT / name).read_bytes())
-        self.assertEqual(files["app/index.html"].replace((builder.analytics_snippet() + "\n").encode(), b""), (ROOT / "index.html").read_bytes())
+        self.assertEqual(files["app/index.html"].replace((builder.analytics_snippet() + "\n").encode(), b"").replace((builder.adsense_snippet() + "\n").encode(), b""), (ROOT / "index.html").read_bytes())
         manifest = json.loads(files["app/manifest.webmanifest"])
         self.assertEqual([manifest[k] for k in ("id", "scope", "start_url")], ["/app/", "./", "./"])
         worker = (ROOT / "scripts/cloudflare-sw.js").read_bytes().decode("utf-8")
@@ -160,6 +160,83 @@ class BuildTests(unittest.TestCase):
         self.assertNotIn(builder.ANALYTICS_TOKEN, worker)
         self.assertNotIn("localStorage", builder.analytics_snippet())
         # App code and stored-data handling are copied without modification.
+        for name in ["script.js", "pwa.js", "recommendation.js"]:
+            self.assertEqual(files["app/" + name], (ROOT / name).read_bytes())
+
+    def adsense_tags(self, data):
+        class Tags(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.in_head = False
+                self.items = []
+            def handle_starttag(self, tag, attrs):
+                if tag == "head":
+                    self.in_head = True
+                item = dict(attrs)
+                if tag == "script" and "pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" in (item.get("src") or ""):
+                    self.items.append((item, self.in_head))
+            def handle_endtag(self, tag):
+                if tag == "head":
+                    self.in_head = False
+        parser = Tags()
+        parser.feed(data.decode())
+        return parser.items
+
+    def test_adsense_is_once_inside_head_on_four_cloudflare_pages(self):
+        files, _ = builder.payload()
+        for name in builder.ADSENSE_PAGES:
+            tags = self.adsense_tags(files[name])
+            self.assertEqual(len(tags), 1, name)
+            tag, in_head = tags[0]
+            self.assertTrue(in_head, name)
+            self.assertEqual(tag["src"], "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8268684254916846")
+            self.assertIn("async", tag)
+            self.assertEqual(tag["crossorigin"], "anonymous")
+            self.assertEqual(len(self.analytics_tags(files[name])), 1)
+            self.assertNotIn(b'<ins class="adsbygoogle"', files[name])
+            self.assertNotIn(b"adsbygoogle.push", files[name])
+        self.assertFalse(self.adsense_tags(files["404.html"]))
+        for name in ["index.html", "landing/index.html", "landing/migration/index.html", "landing/recovery/index.html"]:
+            self.assertFalse(self.adsense_tags((ROOT / name).read_bytes()), name)
+        self.assertNotIn(b"googlesyndication.com", files["app/sw.js"])
+
+    def test_adsense_insertion_is_idempotent(self):
+        for original in [b"<html><head></head><body>test</body></html>", b"<HTML><HEAD></HEAD><BODY>test</BODY></HTML>"]:
+            once = builder.with_adsense(original)
+            self.assertEqual(builder.with_adsense(once), once)
+            self.assertEqual(len(self.adsense_tags(once)), 1)
+        valid = ("<head>" + builder.adsense_snippet() + "</head>").encode()
+        self.assertEqual(builder.with_adsense(valid), valid)
+
+    def test_adsense_duplicates_wrong_publisher_and_wrong_location_stop_build(self):
+        tag = builder.adsense_snippet()
+        for source in [
+            "<head>" + tag + tag + "</head>",
+            ("<head>" + tag + "</head>").replace(builder.ADSENSE_CLIENT, "ca-pub-0000000000000000"),
+            "<head></head><body>" + tag + "</body>",
+            "<head>" + tag.replace(" async", "") + "</head>",
+            "<body>no head</body>",
+        ]:
+            with self.subTest(source=source[:50]), self.assertRaises(ValueError):
+                builder.with_adsense(source.encode())
+
+    def test_adsense_and_analytics_remain_single_on_repeated_insertion(self):
+        source = b"<html><head></head><body>keep content</body></html>"
+        for apply in [
+            lambda data: builder.with_adsense(builder.with_analytics(data)),
+            lambda data: builder.with_analytics(builder.with_adsense(data)),
+        ]:
+            once = apply(source)
+            self.assertEqual(apply(once), once)
+            self.assertEqual(len(self.adsense_tags(once)), 1)
+            self.assertEqual(len(self.analytics_tags(once)), 1)
+
+    def test_adsense_client_change_rotates_app_cache(self):
+        files, before = builder.payload()
+        with patch.object(builder, "ADSENSE_CLIENT", "ca-pub-0000000000000000"):
+            changed, after = builder.payload()
+        self.assertNotEqual(before, after)
+        self.assertNotEqual(files["app/index.html"], changed["app/index.html"])
         for name in ["script.js", "pwa.js", "recommendation.js"]:
             self.assertEqual(files["app/" + name], (ROOT / name).read_bytes())
 

@@ -106,7 +106,7 @@ class WorkerBrowserTests(unittest.TestCase):
         if not cls.binary:
             raise unittest.SkipTest("Chromium not installed; set CHROME_BIN")
         cls.profile = tempfile.TemporaryDirectory(prefix="seedonext-sw-qa-")
-        cls.process = subprocess.Popen([cls.binary, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--disable-background-networking", "--disable-extensions", "--disable-sync", "--host-resolver-rules=MAP static.cloudflareinsights.com ~NOTFOUND, MAP cloudflareinsights.com ~NOTFOUND", "--remote-debugging-port=0", "--remote-debugging-address=127.0.0.1", "--user-data-dir=" + cls.profile.name, "about:blank"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        cls.process = subprocess.Popen([cls.binary, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--disable-background-networking", "--disable-extensions", "--disable-sync", "--host-resolver-rules=MAP static.cloudflareinsights.com ~NOTFOUND, MAP cloudflareinsights.com ~NOTFOUND, MAP pagead2.googlesyndication.com ~NOTFOUND", "--remote-debugging-port=0", "--remote-debugging-address=127.0.0.1", "--user-data-dir=" + cls.profile.name, "about:blank"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         active = Path(cls.profile.name) / "DevToolsActivePort"
         limit = time.monotonic() + 20
         while not active.exists() and time.monotonic() < limit:
@@ -376,6 +376,16 @@ class WorkerBrowserTests(unittest.TestCase):
         self.offline()
         self.navigate("/app/")
         self.assertEqual(self.page.evaluate("JSON.parse(localStorage.getItem('taskflowData')).tasks.length"), 2)
+
+    def test_adsense_is_once_in_head_without_ad_units_on_all_pages(self):
+        for path in ["/", "/app/", "/migration/", "/recovery/"]:
+            result = self.page.call("Page.navigate", {"url": self.base + path})
+            self.assertNotIn("errorText", result)
+            self.page.wait("document.readyState === 'complete' && location.pathname === " + json.dumps(path))
+            tags = self.page.evaluate("""Array.from(document.querySelectorAll('script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]')).map(s=>({src:s.src,async:s.async,crossOrigin:s.crossOrigin,inHead:document.head.contains(s)}))""")
+            self.assertEqual(tags, [{"src": builder.ADSENSE_SCRIPT + "?client=" + builder.ADSENSE_CLIENT, "async": True, "crossOrigin": "anonymous", "inHead": True}], path)
+            self.assertEqual(self.page.evaluate("document.querySelectorAll('script[data-cf-beacon]').length"), 1)
+            self.assertEqual(self.page.evaluate("document.querySelectorAll('ins.adsbygoogle').length"), 0)
 
 
 if __name__ == "__main__":

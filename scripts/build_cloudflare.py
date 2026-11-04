@@ -64,6 +64,49 @@ def with_analytics(data):
     return (html[:end.start()] + analytics_snippet() + "\n" + html[end.start():]).encode("utf-8")
 
 
+ADSENSE_CLIENT = "ca-pub-8268684254916846"
+ADSENSE_SCRIPT = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"
+ADSENSE_PAGES = ("index.html", "app/index.html", "migration/index.html", "recovery/index.html")
+
+
+def adsense_snippet():
+    return f'<script async src="{ADSENSE_SCRIPT}?client={ADSENSE_CLIENT}" crossorigin="anonymous"></script>'
+
+
+def with_adsense(data):
+    """Add the supplied site verification script once, within generated head only."""
+    html = data.decode("utf-8")
+    class Scripts(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.in_head = False
+            self.items = []
+        def handle_starttag(self, tag, attrs):
+            if tag == "head":
+                self.in_head = True
+            item = dict(attrs)
+            src = urlsplit(item.get("src") or "")
+            if tag == "script" and src.hostname == "pagead2.googlesyndication.com" and src.path == "/pagead/js/adsbygoogle.js":
+                self.items.append((item, self.in_head))
+        def handle_endtag(self, tag):
+            if tag == "head":
+                self.in_head = False
+    parsed = Scripts()
+    parsed.feed(html)
+    if parsed.items:
+        if len(parsed.items) != 1:
+            raise ValueError("Duplicate AdSense scripts")
+        item, in_head = parsed.items[0]
+        if (not in_head or item.get("src") != f"{ADSENSE_SCRIPT}?client={ADSENSE_CLIENT}"
+                or "async" not in item or item.get("crossorigin") != "anonymous"):
+            raise ValueError("Conflicting or misplaced AdSense verification script")
+        return data
+    end = re.search(r"</head\s*>", html, flags=re.IGNORECASE)
+    if not end:
+        raise ValueError("AdSense page must have a closing head tag")
+    return (html[:end.start()] + adsense_snippet() + "\n" + html[end.start():]).encode("utf-8")
+
+
 def reject_link(path):
     """Also reject Windows junctions/reparse points, including dangling links."""
     if not os.path.lexists(path):
@@ -107,6 +150,8 @@ def payload():
             result["assets/" + path.name] = path.read_bytes()
     for name in ANALYTICS_PAGES:
         result[name] = with_analytics(result[name])
+    for name in ADSENSE_PAGES:
+        result[name] = with_adsense(result[name])
     # Hash app content, including worker logic, so forgetting the manual version
     # cannot reuse an old cache. Landing-only changes do not invalidate the app.
     digest = hashlib.sha256()
