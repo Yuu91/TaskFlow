@@ -106,7 +106,7 @@ class WorkerBrowserTests(unittest.TestCase):
         if not cls.binary:
             raise unittest.SkipTest("Chromium not installed; set CHROME_BIN")
         cls.profile = tempfile.TemporaryDirectory(prefix="seedonext-sw-qa-")
-        cls.process = subprocess.Popen([cls.binary, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--disable-background-networking", "--disable-extensions", "--disable-sync", "--remote-debugging-port=0", "--remote-debugging-address=127.0.0.1", "--user-data-dir=" + cls.profile.name, "about:blank"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        cls.process = subprocess.Popen([cls.binary, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--disable-background-networking", "--disable-extensions", "--disable-sync", "--host-resolver-rules=MAP static.cloudflareinsights.com ~NOTFOUND, MAP cloudflareinsights.com ~NOTFOUND", "--remote-debugging-port=0", "--remote-debugging-address=127.0.0.1", "--user-data-dir=" + cls.profile.name, "about:blank"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
         active = Path(cls.profile.name) / "DevToolsActivePort"
         limit = time.monotonic() + 20
         while not active.exists() and time.monotonic() < limit:
@@ -159,7 +159,9 @@ class WorkerBrowserTests(unittest.TestCase):
                         self.end_headers()
                         return
                     name = path.lstrip("/")
-                    if name.endswith("/"):
+                    if not name:
+                        name = "index.html"
+                    elif name.endswith("/"):
                         name += "index.html"
                     data = owner.files.get(name)
                     if data is None:
@@ -349,6 +351,31 @@ class WorkerBrowserTests(unittest.TestCase):
         self.page.wait("document.getElementById('repairStatus').dataset.state === 'error'")
         self.assertEqual(self.page.evaluate("JSON.parse(localStorage.getItem('taskflowData')).tasks[0].id"), "keep")
         self.assertTrue(self.page.evaluate("(async()=>!!(await navigator.serviceWorker.getRegistration('/app/')).active)()"))
+
+    def test_analytics_tag_is_once_on_each_generated_page(self):
+        for path in ["/", "/app/", "/migration/", "/recovery/"]:
+            result = self.page.call("Page.navigate", {"url": self.base + path})
+            self.assertNotIn("errorText", result)
+            self.page.wait("document.readyState === 'complete' && location.pathname === " + json.dumps(path))
+            tags = self.page.evaluate("""Array.from(document.querySelectorAll('script[data-cf-beacon]')).map(s => ({src:s.src,type:s.type,config:JSON.parse(s.getAttribute('data-cf-beacon'))}))""")
+            self.assertEqual(tags, [{"src": builder.ANALYTICS_SRC, "type": "module", "config": {"token": builder.ANALYTICS_TOKEN}}], path)
+
+    def test_analytics_blocked_does_not_prevent_task_save_or_pwa(self):
+        self.seed()
+        self.navigate("/app/")
+        self.page.wait("!!navigator.serviceWorker.controller")
+        self.page.evaluate("""document.getElementById('openAddButton').click();
+          const field=document.getElementById('taskInput');
+          field.value='Saved while analytics is blocked';
+          field.dispatchEvent(new Event('input',{bubbles:true}));
+          document.getElementById('addButton').click();""")
+        tasks = self.page.evaluate("JSON.parse(localStorage.getItem('taskflowData')).tasks")
+        self.assertEqual(len(tasks), 2)
+        self.assertEqual(tasks[0]["note"], "do not delete")
+        self.assertEqual(tasks[1]["title"], "Saved while analytics is blocked")
+        self.offline()
+        self.navigate("/app/")
+        self.assertEqual(self.page.evaluate("JSON.parse(localStorage.getItem('taskflowData')).tasks.length"), 2)
 
 
 if __name__ == "__main__":

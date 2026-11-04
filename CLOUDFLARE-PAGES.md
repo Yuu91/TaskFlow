@@ -82,3 +82,32 @@ Cloudflare専用テンプレート scripts/cloudflare-sw.js を生成時に使�
 ブラウザーテストは標準ライブラリとヘッドレスChrome/Edgeを使い、専用の一時プロファイルで実行します。普段のChromeや本番タスクには接続しません。ブラウザーが未検出の場合は未実施（SKIP）になります。必要ならCHROME_BINでブラウザーの実行ファイルを指定してください。
 
 Cloudflare形式の転送で旧workerのERR_FAILEDを再現し、修正版の再登録・繰り返し表示・オフライン起動・旧workerからの更新とデータ維持、およびGitHub Pages形式の従来workerを確認します。実Cloudflareへの再デプロイ、本番Chromeプロファイル、iPhone・Android実機は別途確認が必要です。
+
+## Cloudflare Web Analytics（手動埋め込み）
+
+生成物の /・/app/・/migration/・/recovery/ に、指定トークンのmoduleスニペットを1個ずつ追加します。404ページとGitHub Pages用の元HTMLには追加しません。設定は scripts/build_cloudflare.py の ANALYTICS_TOKEN・ANALYTICS_PAGES にあります。トークンは公開HTMLに含めるサイト識別子です。
+
+ビルド処理は同じ有効なスニペットが既にある場合は再挿入しません。重複や異なるトークンを検出すると、重複計測を防ぐため生成前に停止します。Cloudflare側の自動挿入はビルドでは制御できないため、同じサイトで手動埋め込みと自動挿入を併用しない設定を管理画面で確認してください。今回、管理画面の設定変更やデプロイは行いません。
+
+### 計測の範囲とデータ
+
+ページ別の閲覧・訪問の傾向、参照元、ブラウザー等の情報、表示速度・Web VitalsをCloudflare Web Analyticsで確認します。タスク名・メモ・分類・入力欄・localStorage・バックアップJSONを計測データとして渡す処理は追加しません。個人のタスク内容や作業進捗を分析する機能ではありません。
+
+アプリ内の「ホーム・タスク一覧・バックアップ」はURLを変えずに表示を切り替えるため、各タブ操作や追加・完了ボタンの回数は個別に計測しません。独自イベントは追加していません。ページ閲覧と利用者の実人数は必ずしも一致しません。
+
+オフライン、広告ブロック、通信失敗などでは計測できないことがあります。オフライン中のアクセスを後から送る独自キューはありません。解析スクリプトはService Workerのキャッシュやインストール必須ファイルには追加しません。アプリHTMLの変化は既存の内容ハッシュに含まれ、PWA更新後に計測タグが反映されます。
+
+### 確認
+
+python -B tests/cloudflare_build_test.py
+python -B tests/service_worker_browser_test.py
+python -B scripts/build_cloudflare.py
+
+ブラウザーテストではCloudflareの解析先をDNSで遮断し、テストアクセスが本番の統計に送られないようにします。生成HTMLのタグ・トークン・重複防止、解析が使えない状態での保存・PWA更新・オフライン動作を確認します。本物のbeacon実行・送信内容のネットワーク検査・本番ダッシュボードへの反映は、デプロイ後の確認事項です。
+
+再デプロイ時は dist-cloudflare/ の中身だけを既存Pagesプロジェクトへアップロードしてください。反映後は /・/app/・/migration/・/recovery/ のHTMLでbeaconが1個であること、Networkでbeacon.min.jsが取得でき、計測のPOSTが送られることを確認します。Web Analyticsは反映まで数分かかる場合があります。
+
+公式資料:
+https://developers.cloudflare.com/web-analytics/get-started/
+https://developers.cloudflare.com/web-analytics/faq/
+https://developers.cloudflare.com/speed/observatory/rum-beacon/

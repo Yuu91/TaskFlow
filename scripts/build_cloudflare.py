@@ -1,11 +1,13 @@
 """Build a separate static Pages artifact. Never edits or deletes app sources."""
 import hashlib
+from html.parser import HTMLParser
 import json
 import os
 from pathlib import Path
 import re
 import stat
 import sys
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 OUTPUT = ROOT / "dist-cloudflare"
@@ -14,6 +16,52 @@ APP_FILES = (
     "manifest.webmanifest", "sw.js", "icons/icon-192.png",
     "icons/icon-512.png", "icons/apple-touch-icon.png",
 )
+
+
+ANALYTICS_TOKEN = "e54c00c177484f50a1b3ef31420957ad"
+ANALYTICS_SRC = "https://static.cloudflareinsights.com/beacon.min.js"
+ANALYTICS_PAGES = ("index.html", "app/index.html", "migration/index.html", "recovery/index.html")
+
+
+def analytics_snippet():
+    config = json.dumps({"token": ANALYTICS_TOKEN})
+    return (
+        "<!-- Cloudflare Web Analytics -->"
+        f"<script type='module' src='{ANALYTICS_SRC}' data-cf-beacon='{config}'></script>"
+        "<!-- End Cloudflare Web Analytics -->"
+    )
+
+
+def with_analytics(data):
+    """Inject only into build output; preserve an existing single valid beacon."""
+    html = data.decode("utf-8")
+    class Beacons(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.items = []
+        def handle_starttag(self, tag, attrs):
+            values = dict(attrs)
+            src = urlsplit(values.get("src", ""))
+            if tag == "script" and ("data-cf-beacon" in values or
+                    (src.hostname == "static.cloudflareinsights.com" and src.path == "/beacon.min.js")):
+                self.items.append(values)
+    parsed = Beacons()
+    parsed.feed(html)
+    if parsed.items:
+        if len(parsed.items) != 1:
+            raise ValueError("Duplicate Cloudflare Web Analytics snippets")
+        item = parsed.items[0]
+        try:
+            token = json.loads(item.get("data-cf-beacon") or "{}").get("token")
+        except (ValueError, AttributeError):
+            raise ValueError("Invalid Cloudflare Web Analytics configuration")
+        if item.get("src") != ANALYTICS_SRC or token != ANALYTICS_TOKEN:
+            raise ValueError("Conflicting Cloudflare Web Analytics snippet")
+        return data
+    end = re.search(r"</body\s*>", html, flags=re.IGNORECASE)
+    if not end:
+        raise ValueError("Analytics page must have a closing body tag")
+    return (html[:end.start()] + analytics_snippet() + "\n" + html[end.start():]).encode("utf-8")
 
 
 def reject_link(path):
@@ -57,6 +105,8 @@ def payload():
         checked(path)
         if path.is_file() and path.suffix.lower() in {".webp", ".png", ".jpg", ".jpeg", ".avif"}:
             result["assets/" + path.name] = path.read_bytes()
+    for name in ANALYTICS_PAGES:
+        result[name] = with_analytics(result[name])
     # Hash app content, including worker logic, so forgetting the manual version
     # cannot reuse an old cache. Landing-only changes do not invalidate the app.
     digest = hashlib.sha256()
