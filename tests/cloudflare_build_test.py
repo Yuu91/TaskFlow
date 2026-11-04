@@ -331,6 +331,38 @@ class BuildTests(unittest.TestCase):
             _, after = builder.payload()
         self.assertEqual(before, after)
 
+    def test_search_console_uses_downloaded_original_without_html_injection(self):
+        files, _ = builder.payload()
+        name = builder.SEARCH_CONSOLE_FILE
+        original = (ROOT / name).read_bytes()
+        target = name.removesuffix(".html") + "-verification.txt"
+        self.assertEqual(files[name], original)
+        self.assertEqual(files[target], original)
+        self.assertEqual(files["_redirects"], f"/{name} /{target} 200\n".encode("ascii"))
+        self.assertNotIn("app/" + name, files)
+        self.assertFalse(self.analytics_tags(files[name]))
+        self.assertFalse(self.adsense_tags(files[name]))
+
+    def test_missing_search_console_original_stops_without_fabricating_file(self):
+        original = Path.read_bytes
+        def missing(path):
+            if path == ROOT / builder.SEARCH_CONSOLE_FILE:
+                raise FileNotFoundError(path)
+            return original(path)
+        with patch.object(Path, "read_bytes", missing):
+            with self.assertRaises(FileNotFoundError):
+                builder.payload()
+
+    def test_search_console_file_change_does_not_rotate_app_cache(self):
+        _, before = builder.payload()
+        original = Path.read_bytes
+        def changed(path):
+            data = original(path)
+            return data + b"\n" if path == ROOT / builder.SEARCH_CONSOLE_FILE else data
+        with patch.object(Path, "read_bytes", changed):
+            _, after = builder.payload()
+        self.assertEqual(before, after)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -169,3 +169,15 @@ https://support.google.com/adsense/answer/13554116?hl=ja
 ## ads.txt
 
 landing/ads.txt をビルド時に公開ルートの ads.txt へコピーします。既存AdSenseコードの ca-pub-8268684254916846 と一致する pub-8268684254916846 を使用します。再生成は python -B scripts/build_cloudflare.py。Cloudflareへ dist-cloudflare/ の中身を反映後、https://seedonext.pages.dev/ads.txt がHTMLではなく指定の1行を返すことと、AdSense管理画面の案内との一致を確認してください。GitHub Pages用の直下ファイルやWorkerには追加しません。広告枠・自動広告設定は変更しません。今回、デプロイやGoogle側の認識確認は行いません。
+
+## Google Search Console HTMLファイル認証
+
+プロジェクト直下のダウンロード実物 google4ab1bc7e104c5f27.html を読み取り、dist-cloudflare/直下へバイト単位でコピーします。内容の推測生成・タグ挿入・改行変更は行いません。実物がなければビルドを停止します。認証後もファイルを維持してください。
+
+Cloudflareの.html正規化を避けるため、同じ実物のコピーをgoogle4ab1bc7e104c5f27-verification.txtとして生成し、_redirectsの認証URL限定200内部配信ルールから参照します。ブラウザーのURLを変更する301/302転送ではありません。他のページや/app/のWorkerスコープは変更しません。
+
+再生成は python -B scripts/build_cloudflare.py。既存Cloudflare Pagesプロジェクトへdist-cloudflare/の中身を反映後、https://seedonext.pages.dev/google4ab1bc7e104c5f27.html のHTTPステータス200・Locationなし・本文が実物と一致することを確認し、Search Consoleで「確認」を押してください。別ドメインへの転送、CloudflareのAccess/WAF/上位ルール、本番での内部配信とGoogle側の認証結果は未確認です。今回、デプロイは行いません。
+
+公式資料:
+https://support.google.com/webmasters/answer/9008080?hl=ja
+https://developers.cloudflare.com/pages/configuration/redirects/

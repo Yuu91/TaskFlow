@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 OUTPUT = ROOT / "dist-cloudflare"
+SEARCH_CONSOLE_FILE = "google4ab1bc7e104c5f27.html"
 APP_FILES = (
     "index.html", "style.css", "script.js", "recommendation.js", "pwa.js",
     "manifest.webmanifest", "sw.js", "icons/icon-192.png",
@@ -167,6 +168,13 @@ def payload():
         ("ads.txt", "ads.txt"),
     ):
         result[destination] = checked(ROOT / "landing" / source).read_bytes()
+    # Use the downloaded original unchanged. Never synthesize verification content.
+    verification = checked(ROOT / SEARCH_CONSOLE_FILE).read_bytes()
+    result[SEARCH_CONSOLE_FILE] = verification
+    # Avoid Pages' automatic .html canonical redirect for this exact URL only.
+    verification_target = SEARCH_CONSOLE_FILE.removesuffix(".html") + "-verification.txt"
+    result[verification_target] = verification
+    result["_redirects"] = f"/{SEARCH_CONSOLE_FILE} /{verification_target} 200\n".encode("ascii")
     assets = checked(ROOT / "landing/assets")
     for path in sorted(assets.iterdir()):
         checked(path)

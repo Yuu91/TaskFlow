@@ -150,6 +150,11 @@ class WorkerBrowserTests(unittest.TestCase):
                     self.connection.close()
                     return
                 path = urlsplit(self.path).path
+                for rule in owner.files.get("_redirects", b"").decode().splitlines():
+                    fields = rule.split()
+                    if len(fields) == 3 and fields[0] == path and fields[2] == "200":
+                        path = fields[1]
+                        break
                 if path == "/qa.html":
                     data, kind = b"<!doctype html><title>Isolated QA</title>", "text/html"
                 else:
@@ -167,7 +172,7 @@ class WorkerBrowserTests(unittest.TestCase):
                     if data is None:
                         self.send_error(404)
                         return
-                    kind = "text/javascript" if name.endswith(".js") else "text/css" if name.endswith(".css") else "application/manifest+json" if name.endswith(".webmanifest") else "image/png" if name.endswith(".png") else "image/webp" if name.endswith(".webp") else "text/html"
+                    kind = "text/javascript" if name.endswith(".js") else "text/css" if name.endswith(".css") else "application/manifest+json" if name.endswith(".webmanifest") else "image/png" if name.endswith(".png") else "image/webp" if name.endswith(".webp") else "text/plain" if name.endswith(".txt") else "text/html"
                 self.send_response(200)
                 self.send_header("Content-Type", kind + "; charset=utf-8")
                 self.send_header("Cache-Control", "no-store")
@@ -440,6 +445,20 @@ class WorkerBrowserTests(unittest.TestCase):
         finally:
             if target:
                 self.browser.call("Target.closeTarget", {"targetId":target["targetId"]})
+
+    def test_search_console_exact_url_returns_original_without_redirect(self):
+        self.register()
+        name = builder.SEARCH_CONSOLE_FILE
+        url = self.base + "/" + name
+        with urllib.request.urlopen(url) as response:
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.geturl(), url)
+            self.assertIsNone(response.headers.get("Location"))
+            self.assertEqual(response.read(), (ROOT / name).read_bytes())
+        result = self.page.call("Page.navigate", {"url": url})
+        self.assertNotIn("errorText", result)
+        self.page.wait("document.readyState==='complete' && location.pathname===" + json.dumps("/" + name))
+        self.assertEqual(self.page.evaluate("document.body.innerText.trim()"), (ROOT / name).read_text(encoding="utf-8").strip())
 
 
 if __name__ == "__main__":
