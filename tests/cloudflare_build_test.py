@@ -49,7 +49,7 @@ class BuildTests(unittest.TestCase):
         for name in builder.APP_FILES:
             if name not in {"manifest.webmanifest", "sw.js", "index.html"}:
                 self.assertEqual(files["app/" + name], (ROOT / name).read_bytes())
-        self.assertEqual(files["app/index.html"].replace((builder.analytics_snippet() + "\n").encode(), b"").replace((builder.adsense_snippet() + "\n").encode(), b""), (ROOT / "index.html").read_bytes())
+        self.assertEqual(files["app/index.html"].replace((builder.analytics_snippet() + "\n").encode(), b"").replace((builder.adsense_snippet() + "\n").encode(), b"").replace(builder.PRIVACY_MENU_LINK.encode(), b"").replace(builder.PRIVACY_GUIDE_LINK.encode(), b""), (ROOT / "index.html").read_bytes())
         manifest = json.loads(files["app/manifest.webmanifest"])
         self.assertEqual([manifest[k] for k in ("id", "scope", "start_url")], ["/app/", "./", "./"])
         worker = (ROOT / "scripts/cloudflare-sw.js").read_bytes().decode("utf-8")
@@ -275,6 +275,41 @@ class BuildTests(unittest.TestCase):
         with patch.object(Path, "read_bytes", changed):
             _, after = builder.payload()
         self.assertEqual(before, after)
+
+    def test_privacy_page_and_links_are_generated_with_official_choices(self):
+        files, _ = builder.payload()
+        text = files["privacy/index.html"].decode()
+        self.assertIn('<time datetime="2026-11-04">', text)
+        self.assertIn("localStorage", text)
+        self.assertIn("sessionStorage", text)
+        self.assertIn('href="mailto:seedonextsupport@gmail.com"', text)
+        self.assertNotIn("お問い合わせ窓口は現在準備中", text)
+        self.assertIn('href="mailto:seedonextsupport@gmail.com"', files["index.html"].decode())
+        for url in ["https://www.google.com/settings/ads", "https://myadcenter.google.com/", "https://policies.google.com/technologies/ads?hl=ja", "https://www.aboutads.info/choices/"]:
+            self.assertIn('href="' + url + '"', text)
+        self.assertIn('href="./privacy/"', files["index.html"].decode())
+        self.assertIn(builder.PRIVACY_MENU_LINK, files["app/index.html"].decode())
+        self.assertIn(builder.PRIVACY_GUIDE_LINK, files["app/index.html"].decode())
+        self.assertNotIn(b"cloudflarePrivacyPolicyLink", (ROOT / "index.html").read_bytes())
+
+    def test_app_privacy_links_are_idempotent_and_detect_duplicates(self):
+        source = (ROOT / "index.html").read_bytes()
+        once = builder.with_app_privacy_links(source)
+        self.assertEqual(builder.with_app_privacy_links(once), once)
+        self.assertEqual(once.replace(builder.PRIVACY_MENU_LINK.encode(), b"").replace(builder.PRIVACY_GUIDE_LINK.encode(), b""), source)
+        with self.assertRaises(ValueError):
+            builder.with_app_privacy_links(once + builder.PRIVACY_MENU_LINK.encode())
+
+    def test_privacy_page_has_no_new_tracking_or_worker_scope(self):
+        files, _ = builder.payload()
+        privacy = files["privacy/index.html"]
+        self.assertFalse(self.analytics_tags(privacy))
+        self.assertFalse(self.adsense_tags(privacy))
+        self.assertNotIn(b"./privacy", files["app/sw.js"])
+        for name in builder.ANALYTICS_PAGES:
+            self.assertEqual(len(self.analytics_tags(files[name])), 1)
+        for name in builder.ADSENSE_PAGES:
+            self.assertEqual(len(self.adsense_tags(files[name])), 1)
 
 
 if __name__ == "__main__":

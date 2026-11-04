@@ -404,6 +404,43 @@ class WorkerBrowserTests(unittest.TestCase):
             self.assertEqual(self.page.evaluate("document.querySelectorAll('script[data-cf-beacon]').length"), 1)
             self.assertEqual(self.page.evaluate("document.head.querySelectorAll('script[src*=googlesyndication]').length"), 1)
 
+    def test_privacy_page_is_linked_and_readable_on_phone_and_desktop(self):
+        result = self.page.call("Page.navigate", {"url": self.base + "/"})
+        self.assertNotIn("errorText", result)
+        self.page.wait("document.readyState==='complete' && !!document.querySelector('footer a[href=\"./privacy/\"]')")
+        self.assertEqual(self.page.evaluate("document.querySelector('footer a[href^=mailto]').getAttribute('href')"), "mailto:seedonextsupport@gmail.com")
+        self.page.evaluate("document.querySelector('footer a[href=\"./privacy/\"]').click()")
+        self.page.wait("document.readyState==='complete' && location.pathname==='/privacy/'")
+        for width in [360, 768, 1280]:
+            self.page.call("Emulation.setDeviceMetricsOverride", {"width":width,"height":900,"deviceScaleFactor":1,"mobile":width<600})
+            self.assertTrue(self.page.evaluate("document.documentElement.scrollWidth<=innerWidth"), width)
+            self.assertGreaterEqual(self.page.evaluate("parseFloat(getComputedStyle(document.body).fontSize)"), 16)
+            self.assertTrue(self.page.evaluate("document.getElementById('main').getBoundingClientRect().left>=16 && document.getElementById('main').getBoundingClientRect().right<=innerWidth-16"), width)
+        self.assertEqual(self.page.evaluate("document.querySelector('time').getAttribute('datetime')"), "2026-11-04")
+        self.assertEqual(self.page.evaluate("document.querySelectorAll('script[data-cf-beacon],script[src*=googlesyndication]').length"), 0)
+        self.assertEqual(self.page.evaluate("document.getElementById('contact').parentElement.querySelector('a[href^=mailto]').getAttribute('href')"), "mailto:seedonextsupport@gmail.com")
+
+    def test_app_policy_opens_new_tab_without_losing_tasks_or_input(self):
+        self.seed()
+        self.navigate("/app/")
+        self.page.evaluate("document.getElementById('openAddButton').click();document.getElementById('taskInput').value='Unsaved QA draft';document.getElementById('cancelAddButton').click();document.getElementById('menuButton').click()")
+        before = self.page.evaluate("localStorage.getItem('taskflowData')")
+        self.page.call("Runtime.evaluate", {"expression":"document.getElementById('cloudflarePrivacyPolicyLink').click()", "userGesture":True})
+        target = None
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline and target is None:
+            target = next((t for t in self.browser.call("Target.getTargets")["targetInfos"] if t["type"]=="page" and t["url"]==self.base+"/privacy/"), None)
+            if target is None:
+                time.sleep(.05)
+        self.assertIsNotNone(target, "Policy should open in a separate tab")
+        try:
+            self.assertEqual(self.page.evaluate("localStorage.getItem('taskflowData')"), before)
+            self.assertEqual(self.page.evaluate("document.getElementById('taskInput').value"), "Unsaved QA draft")
+            self.assertEqual(self.page.evaluate("document.getElementById('cloudflarePrivacyPolicyLink').rel"), "noopener")
+        finally:
+            if target:
+                self.browser.call("Target.closeTarget", {"targetId":target["targetId"]})
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

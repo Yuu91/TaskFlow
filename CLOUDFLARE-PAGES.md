@@ -134,3 +134,34 @@ Cloudflare Web Analyticsは従来どおり各ページ1個を維持します。4
 https://support.google.com/adsense/answer/7584263
 https://support.google.com/adsense/answer/9274634
 https://support.google.com/adsense/answer/9261307
+
+## プライバシーポリシー（最終更新：2026-11-04）
+
+landing/privacy/index.html を /privacy/ として生成します。紹介ページのフッターとCloudflare生成アプリの☰メニュー・「データの保存について」にリンクします。アプリ側は新しいタブで開き、入力途中の画面を維持します。元のGitHub Pages用HTMLは変更しません。ポリシーは/app/のWorkerスコープ外で、オフライン閲覧の保証対象ではありません。新しい解析・広告タグもこのページには追加しません。
+
+### 確認した事実
+
+- タスク・振り返り・案内設定・復元前退避はlocalStorage。入力途中はsessionStorage。旧版保存キーも読み込みます。
+- 独自コードにCookie設定処理やタスク本文・JSONをアップロードする処理はありません。
+- バックアップは暗号化されないJSON。共有・コピーを利用者が選ぶと選択先へ内容が渡る可能性があります。
+- Cloudflare配信、解析、Google AdSenseのコードによる通信があるため、サイト全体を「Cookieなし」「外部通信なし」とは説明しません。
+- 広告枠・自動広告の有効化・CMPの設定は今回追加していません。
+
+### 公開前に運営者が設定・確認する事項
+
+1. 公式問い合わせ先 seedonextsupport@gmail.com をポリシーのcontact節と紹介ページにmailtoリンクで設定済み。実際の送受信、受信メールの管理・保管期間、必要な運営者の公開表記は別途確認する。テストメールの送信はしていない。
+2. Google管理画面の自動広告・パーソナライズ・第三者配信事業者、実際のCookieを確認し、必要なリンク・説明を更新する。
+3. 対象地域と広告配信方式に応じてGoogle認定CMP・同意取得等の要件を確認する。ポリシーの掲載だけで同意を得たことにはならない。
+4. Cloudflare側の解析自動挿入、配信ログの保存期間、保護機能の設定を確認する。管理画面へは接続していない。
+5. デプロイ後に /privacy/ と紹介ページ・アプリからのリンクをスマホ実機でも確認する。Google審査の合格や法令適合を保証するものではない。
+
+Google公式の確認資料:
+https://support.google.com/adsense/answer/1348695?hl=ja
+https://support.google.com/adsense/answer/7549925?hl=ja
+https://policies.google.com/technologies/partner-sites?hl=ja
+https://policies.google.com/technologies/ads?hl=ja
+https://support.google.com/adsense/answer/13554116?hl=ja
+
+既存と同じコマンドでテスト・ビルドします。アプリHTMLのメニューリンク追加で内容ハッシュは変わりますが、Worker本体・キャッシュ戦略・保存形式は変更しません。
+
+公式問い合わせ先の追記（2026-11-04）：サービス概要と、問い合わせメールの返信・内容確認への利用、Gmail受信についてポリシーへ追記。アプリからは既存のポリシーリンク経由で問い合わせ先を参照できる。/privacy/はWorkerの/app/スコープ外のためオンライン閲覧を維持し、Workerやキャッシュ戦略は変更しない。デプロイ時は既存プロジェクトへdist-cloudflare/の中身をアップロードし、/privacy/とフッターのmailto宛先を確認する。

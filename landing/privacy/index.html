@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="SeeDonextのCloudflare Pages版における端末内保存、バックアップ、アクセス解析、広告・Cookieの取り扱いについて。">
+  <title>プライバシーポリシー｜SeeDonext</title>
+  <link rel="stylesheet" href="../landing.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">本文へスキップ</a>
+  <header class="site-header wrap"><a class="brand" href="../">SeeDonext</a><a class="button button-small button-outline" href="../app/">アプリを開く</a></header>
+  <main id="main" class="document wrap">
+    <p class="eyebrow">データの取り扱いについて</p>
+    <h1>プライバシーポリシー</h1>
+    <p>最終更新日：<time datetime="2026-11-04">2026年11月4日</time></p>
+    <p>SeeDonextは、締切・重要度・進捗などを手掛かりに取り組む順番を確認できる、登録不要のタスク管理Webアプリです。</p>
+    <p>本ポリシーはSeeDonextのCloudflare Pages版（seedonext.pages.dev。以下「当サイト」）に適用します。アプリの端末内保存と、サイトの配信・アクセス解析・広告に伴う通信を分けて説明します。</p>
+    <div class="notice"><strong>まず知っていただきたいこと</strong><ul><li>タスクや振り返りは、利用しているブラウザー・ホーム画面アプリ内に保存します。端末間の自動同期はありません。</li><li>Cloudflareの解析とGoogle AdSenseのコードを読み込むため、「サイト全体で外部通信やCookieを使わない」仕組みではありません。</li><li>バックアップJSONは暗号化されていません。保存先・共有相手を確認してください。</li></ul></div>
+    <nav aria-label="このページの目次"><details><summary>目次</summary><ol><li><a href="#local-data">タスクと端末内保存</a></li><li><a href="#backup">バックアップ・共有・削除</a></li><li><a href="#hosting">サイト配信</a></li><li><a href="#analytics">アクセス解析</a></li><li><a href="#ads">広告と第三者配信</a></li><li><a href="#choices">Cookie・広告設定</a></li><li><a href="#contact">お問い合わせ・改定</a></li></ol></details></nav>
+    <section aria-labelledby="local-data"><h2 id="local-data">1. タスクと端末内保存</h2>
+      <p>SeeDonextはアカウント登録を必要としません。タスク名、締切・予定日、重要度、作業規模、進捗、完了状況、親子関係、分類、メモ、日ごとの振り返りを、アプリの表示・編集・おすすめ順の計算に使用します。</p>
+      <ul><li><strong>localStorage：</strong>タスク、振り返り、ホーム画面追加の案内を閉じた設定などを保存します。復元時には復元前データを端末内に退避します。旧版の保存データを読み込む処理もあります。</li><li><strong>sessionStorage：</strong>フォームやメモの入力途中を、同じタブでの再読み込みに備えて一時退避します。タブ終了やOSの処理などで失われる場合があり、正式な保存の代わりにはなりません。</li><li><strong>オフライン用キャッシュ：</strong>Service WorkerがHTML・CSS・JavaScript・アイコンなどの画面ファイルを保存し、アプリの起動や更新に使用します。</li></ul>
+      <p>アプリ独自の処理には、タスク本文やメモを運営サーバーへアップロードする機能はありません。解析・広告の計測パラメーターに、入力したタスク本文・メモ・バックアップJSONを設定する実装もありません。ただし、後述の外部スクリプトに伴う通信は別に発生します。</p>
+      <p>保存期間は利用者の操作とブラウザー・OSの管理に依存します。故障、サイトデータの削除、容量不足などで失われる可能性があります。Safari、ホーム画面アプリ、LINE内ブラウザー、別ドメインなどで保存場所が異なる場合があり、自動同期・移行は行いません。端末内保存は暗号化された保管庫として設計していません。</p>
+    </section>
+    <section aria-labelledby="backup"><h2 id="backup">2. バックアップ・共有・削除</h2>
+      <p>バックアップはタスクと振り返りを含むJSONです。分類で絞っていても全分類を含みます。ファイルの読み込みと復元はアプリ内で処理し、独自のアップロード先へ送信しません。復元は現在の全データを置き換える操作です。</p>
+      <p>利用者が共有メニューやコピーを選ぶと、選択したアプリ・クラウド保存先・共有相手に内容が渡る場合があります。その保存先では各サービスのポリシーが適用されます。暗号化されていないため、公開リポジトリなど不特定多数が見られる場所に控えを置かないでください。</p>
+      <p>タスクはアプリ内で削除できますが、旧形式データや復元前の控えに過去の内容が残る場合があります。端末内データをまとめて消すにはブラウザーのサイトデータ管理を使用します。<strong>サイトデータの消去ではタスク・設定も失われます。先に必要なバックアップを保存してください。</strong>端末外のJSONは、その保存先でも別途削除が必要です。運営者が利用者の端末内データを遠隔削除する機能はありません。</p>
+    </section>
+    <section aria-labelledby="hosting"><h2 id="hosting">3. サイト配信に伴う通信</h2>
+      <p>当サイトはCloudflare Pagesを利用しています。ページ・画像の取得や更新では、IPアドレス、アクセス先URL、日時、ブラウザー情報などの通信情報が配信事業者に伝わります。配信・不正アクセス対策などの取り扱いは、Cloudflareの設定とポリシーに従います。</p>
+      <p><a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener noreferrer">Cloudflareのプライバシーポリシー</a></p>
+    </section>
+    <section aria-labelledby="analytics"><h2 id="analytics">4. Cloudflare Web Analytics</h2>
+      <p>紹介ページ、アプリ、移行案内、接続修復ページにCloudflare Web Analyticsを設置し、閲覧傾向、参照元、ブラウザー等の情報、読み込み速度・表示性能を確認するために利用します。本ポリシーページには解析・広告タグを追加していません。</p>
+      <p>Cloudflareは、Web AnalyticsではCookieやlocalStorageを解析目的で使用せず、利用者を追跡するためのフィンガープリントを行わないと説明しています。これは解析方式の説明であり、Googleの広告Cookieや配信・保護機能までCookieを使わないという意味ではありません。</p>
+      <p>タブ操作・タスクの追加や完了を区別する独自イベントは設定していません。オフラインや通信制限で計測が欠ける場合があります。</p>
+      <p><a href="https://developers.cloudflare.com/speed/observatory/rum-beacon/" target="_blank" rel="noopener noreferrer">Cloudflareの収集情報</a> ／ <a href="https://www.cloudflare.com/trust-hub/gdpr/" target="_blank" rel="noopener noreferrer">Cloudflareのプライバシーに関する説明</a></p>
+    </section>
+    <section aria-labelledby="ads"><h2 id="ads">5. Google AdSenseと第三者の広告</h2>
+      <p>紹介ページ、アプリ、移行案内、接続修復ページにGoogle AdSenseのサイト確認用コードを設置しています。現在のサイト実装には個別の広告枠はありません。広告表示は審査状況やGoogle側の設定により変わります。確認用コードもGoogleとの通信を伴うため、広告が見えていない場合でも外部通信がないとは限りません。</p>
+      <p>Googleの説明によると、Googleのサービスを使うサイトの閲覧時には、ページのURLやIPアドレスなどがGoogleへ自動的に送信され、Cookieが設定・読み取られる場合があります。Googleはサービス提供、広告効果の測定、不正利用の防止などに、設定に応じて情報を利用します。</p>
+      <p>Googleなどの第三者配信事業者は、当サイトや他サイトでの過去の閲覧情報をもとに広告を選ぶため、Cookieを使用することがあります。Googleの広告Cookieにより、Googleとそのパートナーは複数サイトへのアクセス情報を参考にパーソナライズされた広告を配信できます。</p>
+      <p>広告配信時には、Google認定広告ネットワークなどGoogle以外の第三者の広告やCookieが使われる場合もあります。実際の事業者・利用方法は配信設定によって異なります。各事業者の説明や広告上の案内も確認してください。</p>
+      <ul><li><a href="https://policies.google.com/technologies/partner-sites?hl=ja" target="_blank" rel="noopener noreferrer">Googleがパートナーサイトから収集する情報</a></li><li><a href="https://policies.google.com/privacy?hl=ja" target="_blank" rel="noopener noreferrer">Googleプライバシーポリシー</a></li><li><a href="https://support.google.com/admanager/answer/94149?hl=ja" target="_blank" rel="noopener noreferrer">Googleの第三者広告配信事業者に関する案内</a></li></ul>
+    </section>
+    <section aria-labelledby="choices"><h2 id="choices">6. Cookie・広告設定の選択肢</h2>
+      <p>独自のアプリコードにCookieの設定処理はありませんが、外部サービスはCookie等を使う場合があります。Cookieはブラウザーで確認・制限できます。パーソナライズの停止は、広告そのものやすべてのCookie・通信を停止する操作ではありません。</p>
+      <ul><li><a href="https://www.google.com/settings/ads" target="_blank" rel="noopener noreferrer">Googleの広告設定</a>や<a href="https://myadcenter.google.com/" target="_blank" rel="noopener noreferrer">マイ アド センター</a>で、パーソナライズについて確認・変更できます。適用範囲はGoogleの案内を確認してください。</li><li><a href="https://policies.google.com/technologies/ads?hl=ja" target="_blank" rel="noopener noreferrer">Googleの広告に関する説明</a> ／ <a href="https://policies.google.com/technologies/cookies?hl=ja" target="_blank" rel="noopener noreferrer">GoogleのCookieに関する説明</a></li><li>Google以外の事業者は、その事業者が提供する設定をご利用ください。対応する事業者については、<a href="https://www.aboutads.info/choices/" target="_blank" rel="noopener noreferrer">AboutAdsの選択ページ（第三者サービス）</a>から、関心に基づく広告へのCookie利用を停止できる場合があります。</li></ul>
+      <p>Cookieの設定とタスクの端末内保存は異なります。ただし「サイトデータをすべて削除」ではタスクも削除される場合があるため、操作前にバックアップを確認してください。</p>
+    </section>
+    <section aria-labelledby="contact"><h2 id="contact">7. お問い合わせ・改定</h2>
+      <p>SeeDonextおよび本ポリシーに関するお問い合わせ：<a href="mailto:seedonextsupport@gmail.com">seedonextsupport@gmail.com</a></p>
+      <p>メールアプリから送信できます。お問い合わせで受け取ったメールアドレス・本文などの情報は、返信と内容の確認に利用します。受信にはGoogleのGmailを利用するため、Googleのプライバシーポリシーも適用されます。</p>
+      <p>バックアップJSONやパスワードなどは、必要がない限り添付・記載しないでください。アプリからタスクデータを自動添付する機能はありません。</p>
+      <p>データの取り扱いや利用サービスを変更する場合は、本ページの内容と最終更新日を更新します。</p>
+    </section>
+    <p><a class="text-link" href="../">紹介ページへ戻る</a> ／ <a class="text-link" href="../app/">アプリを開く</a></p>
+  </main>
+  <footer class="site-footer wrap"><p>SeeDonext · プライバシーポリシー</p></footer>
+</body>
+</html>

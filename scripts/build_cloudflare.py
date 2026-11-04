@@ -107,6 +107,28 @@ def with_adsense(data):
     return (html[:end.start()] + adsense_snippet() + "\n" + html[end.start():]).encode("utf-8")
 
 
+PRIVACY_MENU_LINK = '<a id="cloudflarePrivacyPolicyLink" href="../privacy/" target="_blank" rel="noopener" style="display:block;padding:15px 0">プライバシーポリシー（新しいタブ）</a>'
+PRIVACY_GUIDE_LINK = '<p id="cloudflarePrivacyNotice">Cloudflare版のアクセス解析・広告・Cookieについては、<a href="../privacy/" target="_blank" rel="noopener">プライバシーポリシー（新しいタブ）</a>をご確認ください。</p>'
+
+
+def with_app_privacy_links(data):
+    """Add links only to the Cloudflare output; preserve GitHub HTML."""
+    html = data.decode("utf-8")
+    ids = ('id="cloudflarePrivacyPolicyLink"', 'id="cloudflarePrivacyNotice"')
+    if any(marker in html for marker in ids):
+        if all(html.count(marker) == 1 for marker in ids) and PRIVACY_MENU_LINK in html and PRIVACY_GUIDE_LINK in html:
+            return data
+        raise ValueError("Conflicting or duplicate privacy links")
+    menu = re.search(r'<button id="menuPrivacyButton"[^>]*>[\s\S]*?</button>', html)
+    if not menu:
+        raise ValueError("Cannot find app privacy menu")
+    html = html[:menu.end()] + PRIVACY_MENU_LINK + html[menu.end():]
+    guide = re.search(r'<details id="privacyGuide"[^>]*>\s*<summary>[\s\S]*?</summary>', html)
+    if not guide:
+        raise ValueError("Cannot find app privacy guide")
+    return (html[:guide.end()] + PRIVACY_GUIDE_LINK + html[guide.end():]).encode("utf-8")
+
+
 def reject_link(path):
     """Also reject Windows junctions/reparse points, including dangling links."""
     if not os.path.lexists(path):
@@ -141,6 +163,7 @@ def payload():
         ("index.html", "index.html"), ("landing.css", "landing.css"),
         ("migration/index.html", "migration/index.html"), ("404.html", "404.html"),
         ("recovery/index.html", "recovery/index.html"),
+        ("privacy/index.html", "privacy/index.html"),
     ):
         result[destination] = checked(ROOT / "landing" / source).read_bytes()
     assets = checked(ROOT / "landing/assets")
@@ -152,6 +175,7 @@ def payload():
         result[name] = with_analytics(result[name])
     for name in ADSENSE_PAGES:
         result[name] = with_adsense(result[name])
+    result["app/index.html"] = with_app_privacy_links(result["app/index.html"])
     # Hash app content, including worker logic, so forgetting the manual version
     # cannot reuse an old cache. Landing-only changes do not invalidate the app.
     digest = hashlib.sha256()
